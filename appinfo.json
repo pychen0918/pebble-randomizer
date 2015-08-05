@@ -1,8 +1,8 @@
 {
   "uuid": "31a420a4-bff1-4d5d-ac3c-cc816a5071ac",
-  "shortName": "pebble-randomizer",
-  "longName": "pebble-randomizer",
-  "companyName": "MakeAwesomeHappen",
+  "shortName": "Random Picker",
+  "longName": "Random Picker",
+  "companyName": "pychen0918",
   "versionLabel": "1.0",
   "sdkVersion": "3",
   "targetPlatforms": ["aplite", "basalt"],
