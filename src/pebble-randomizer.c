@@ -83,10 +83,34 @@ static void result_window_load(Window *window) {
 	text_layer_set_text_color(s_result_layer, GColorBlack);
 	text_layer_set_text(s_result_layer, result);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_layer));
+
+	// Send app message for test!
+	DictionaryIterator *iter;
+        app_message_outbox_begin(&iter);
+        // Add a key-value pair
+        dict_write_uint8(iter, 0, 0);
+        // Send the message!
+        app_message_outbox_send();
 }
 
 static void result_window_unload(Window *window) {
 	text_layer_destroy(s_result_layer);
+}
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context){
+	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+	APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+	APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+	APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
 }
 
 static void init(){
@@ -106,6 +130,15 @@ static void init(){
 		.load = result_window_load,
 		.unload = result_window_unload,
 	});
+
+	// Register AppMessage callbacks
+	app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_dropped(inbox_dropped_callback);
+	app_message_register_outbox_failed(outbox_failed_callback);
+	app_message_register_outbox_sent(outbox_sent_callback);
+
+	// Open AppMessage
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 
 	window_stack_push(s_menu_window, true);
 }
