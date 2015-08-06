@@ -67,17 +67,21 @@ static void menu_window_unload(Window *window) {
 
 static void result_window_load(Window *window) {
 	static char result[16];
+	int index;
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
+
+	index = rand()%LIST_MENU_ROWS;
+	strncpy(result, list_menu_text[index], sizeof(result));
 
 	s_result_layer = text_layer_create(bounds);
 	text_layer_set_font(s_result_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_result_layer, GTextAlignmentCenter);
 	text_layer_set_background_color(s_result_layer, GColorClear);
 	text_layer_set_text_color(s_result_layer, GColorBlack);
-	text_layer_set_text(s_result_layer, "Result");
+	text_layer_set_text(s_result_layer, result);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_layer));
 }
 
@@ -86,6 +90,9 @@ static void result_window_unload(Window *window) {
 }
 
 static void init(){
+	// Initialize random seed
+	srand(time(NULL));
+
 	// Create main window
 	s_menu_window = window_create();
 	window_set_window_handlers(s_menu_window, (WindowHandlers){
