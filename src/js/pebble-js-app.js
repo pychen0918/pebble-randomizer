@@ -27,13 +27,27 @@ function locationSuccess(pos){
 
 	xhrRequest(url, 'GET',
 		function(responseText) {
-			// responseText contains a JSON object with weather info
 			var json = JSON.parse(responseText);
 			var key;
+			var dictionary = {};
+			
+			// Parse and store the food info
 			for(key in json.results){
-				console.log(key+" name: " + json.results[key].name);
+				dictionary[key] = json.results[key].name;
+				//console.log(key+" name: " + json.results[key].name);
+				console.log(key+" name: " + dictionary[key]);
 			}
 			console.log("List complete");
+
+			// Send to Pebble
+			Pebble.sendAppMessage(dictionary,
+				function(e) {
+					console.log("List sent to Pebble successfully!");
+				},
+				function(e) {
+					console.log("Error sending list info to Pebble!");
+				}
+			);
 		}
 	);
 }

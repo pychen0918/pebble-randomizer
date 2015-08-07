@@ -86,11 +86,11 @@ static void result_window_load(Window *window) {
 
 	// Send app message for test!
 	DictionaryIterator *iter;
-        app_message_outbox_begin(&iter);
-        // Add a key-value pair
-        dict_write_uint8(iter, 0, 0);
-        // Send the message!
-        app_message_outbox_send();
+	app_message_outbox_begin(&iter);
+	// Add a key-value pair
+	dict_write_uint8(iter, 0, 0);
+	// Send the message!
+	app_message_outbox_send();
 }
 
 static void result_window_unload(Window *window) {
@@ -98,7 +98,16 @@ static void result_window_unload(Window *window) {
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
+	// Read first item
+	Tuple *t = dict_read_first(iterator);
+
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
+	// For all items
+	while(t != NULL) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "Name: %s", t->value->cstring);
+		// Look for next item
+		t = dict_read_next(iterator);
+	}
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
