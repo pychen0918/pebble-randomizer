@@ -35,7 +35,7 @@ function locationSuccess(pos){
 			for(key in json.results){
 				dictionary[key] = json.results[key].name;
 				//console.log(key+" name: " + json.results[key].name);
-				console.log(key+" name: " + dictionary[key]);
+				//console.log(key+" name: " + dictionary[key]);
 			}
 			console.log("List complete");
 
@@ -61,7 +61,7 @@ function getLocation() {
 	navigator.geolocation.getCurrentPosition(
 	locationSuccess,
 	locationError,
-	{timeout: 15000, maximumAge: 60000}
+	{enableHighAccuracy: false, timeout: 30000, maximumAge: 600000}
 	);
 }
 
