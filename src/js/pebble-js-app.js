@@ -20,24 +20,34 @@ function locationSuccess(pos){
 	
 	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" + 
 		"location=" + pos.coords.latitude + "," + pos.coords.longitude + 
-		"&radius=" + "500" + 
+		"&radius=" + "5000" + 
 		"&types=" + "food" + 
 		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
 	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
 		function(responseText) {
-			var json = JSON.parse(responseText);
+			var json;
 			var key;
 			var dictionary = {};
 			
-			// Parse and store the food info
-			for(key in json.results){
-				dictionary[key] = json.results[key].name;
-				//console.log(key+" name: " + json.results[key].name);
-				//console.log(key+" name: " + dictionary[key]);
+			// Parse response with exception handle
+			// It is possible that google returned with error page
+			try{
+				json = JSON.parse(responseText);
+				// Parse and store the food info
+				for(key in json.results){
+					dictionary[key] = json.results[key].name;
+					//console.log(key+" name: " + json.results[key].name);
+					//console.log(key+" name: " + dictionary[key]);
+				}
+				console.log("List complete");
+			} 
+			catch(e){
+				console.log("Error while parsing response: ");
+				console.log(responseText);
+				dictionary[0] = "Cannot get location information";
 			}
-			console.log("List complete");
 
 			// Send to Pebble
 			Pebble.sendAppMessage(dictionary,
