@@ -21,9 +21,6 @@ static TextLayer *s_result_layer;
 static Window *s_list_window;
 static MenuLayer *s_list_layer;
 
-// The dictionary that stores the returned list
-
-
 static uint16_t main_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
 	return MAIN_MENU_ROWS;
 }
@@ -37,7 +34,7 @@ static void main_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIn
 }
 
 static uint16_t list_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
-	return LIST_MENU_ROWS;
+	return num_of_list_items;
 }
 
 static void list_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
@@ -168,6 +165,9 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 static void init(){
 	// Initialize random seed
 	srand(time(NULL));
+
+	// Initialize variables
+	num_of_list_items = 0;
 
 	// Create main window
 	s_menu_window = window_create();
