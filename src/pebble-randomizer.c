@@ -1,11 +1,13 @@
 #include <pebble.h>
 #define MAIN_MENU_ROWS	2
-#define LIST_MENU_ROWS  6
+#define LIST_MENU_ROWS  10
 
 static char main_menu_text[MAIN_MENU_ROWS][16] = {"Random!","List"};
-static char list_menu_text[LIST_MENU_ROWS][16] = {"First","Second", "Third", "Fourth", "Fifth", "Sixth"};
+static char list_menu_text[LIST_MENU_ROWS][64];
+static int num_of_list_items;
 
-static char s_menu_text[16];
+static char s_menu_text[32];
+static char s_list_text[32];
 
 // The main menu with "Random" and "List" options
 static Window *s_menu_window;
@@ -19,27 +21,48 @@ static TextLayer *s_result_layer;
 static Window *s_list_window;
 static MenuLayer *s_list_layer;
 
-static uint16_t get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
+static uint16_t main_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
 	return MAIN_MENU_ROWS;
 }
 
-static void draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
+static void main_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	char* text = main_menu_text[cell_index->row];
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Draw row handler");
 	snprintf(s_menu_text, sizeof(s_menu_text), "%s", text);
 
 	menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
 }
 
+static uint16_t list_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
+	return num_of_list_items;
+}
+
+static void list_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
+	char* text = list_menu_text[cell_index->row];
+
+	snprintf(s_list_text, sizeof(s_list_text), "%s", text);
+
+	menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
+}
+
 static void select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+	DictionaryIterator *iter;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 	switch(cell_index->row){
 		case 0:
 			window_stack_push(s_result_window, true);
 			break;
+		case 1:
+			// window_stack_push(s_list_window, true);
+			app_message_outbox_begin(&iter);
+			// Add a key-value pair
+			dict_write_uint8(iter, 0, 0);
+			// Send the message!
+			app_message_outbox_send();	
+			break;
 		default:
+			APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown selection");
 			break;
 	}
 }
@@ -53,8 +76,8 @@ static void menu_window_load(Window *window) {
 
 	s_menu_layer = menu_layer_create(bounds);
 	menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks){
-		.get_num_rows = get_num_rows_callback,
-		.draw_row = draw_row_handler,
+		.get_num_rows = main_get_num_rows_callback,
+		.draw_row = main_draw_row_handler,
 		.select_click = select_callback
 	});
 	menu_layer_set_click_config_onto_window(s_menu_layer, window);
@@ -89,9 +112,62 @@ static void result_window_unload(Window *window) {
 	text_layer_destroy(s_result_layer);
 }
 
+static void list_window_load(Window *window) {
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+
+	APP_LOG(APP_LOG_LEVEL_INFO, "List load");
+
+	s_list_layer = menu_layer_create(bounds);
+	menu_layer_set_callbacks(s_list_layer, NULL, (MenuLayerCallbacks){
+		.get_num_rows = list_get_num_rows_callback,
+		.draw_row = list_draw_row_handler,
+		.select_click = select_callback
+	});
+	menu_layer_set_click_config_onto_window(s_list_layer, window);
+	layer_add_child(window_layer, menu_layer_get_layer(s_list_layer));
+}
+
+static void list_window_unload(Window *window) {
+	menu_layer_destroy(s_list_layer);
+}
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context){
+	// Read first item
+	Tuple *t = dict_read_first(iterator);
+	int i = 0;
+
+	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
+	// For all items
+	while(t != NULL && i < LIST_MENU_ROWS) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "Name: %s", t->value->cstring);
+		strncpy(list_menu_text[i], t->value->cstring, sizeof(list_menu_text[i]));
+		// Look for next item
+		i++;
+		t = dict_read_next(iterator);
+	}
+	num_of_list_items = i;
+	window_stack_push(s_list_window, true);
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+	APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+	APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+	APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
 static void init(){
 	// Initialize random seed
 	srand(time(NULL));
+
+	// Initialize variables
+	num_of_list_items = 0;
 
 	// Create main window
 	s_menu_window = window_create();
@@ -107,13 +183,30 @@ static void init(){
 		.unload = result_window_unload,
 	});
 
+	// Create list window
+	s_list_window = window_create();
+	window_set_window_handlers(s_list_window, (WindowHandlers){
+		.load = list_window_load,
+		.unload = list_window_unload,
+	});
+
+	// Register AppMessage callbacks
+	app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_dropped(inbox_dropped_callback);
+	app_message_register_outbox_failed(outbox_failed_callback);
+	app_message_register_outbox_sent(outbox_sent_callback);
+
+	// Open AppMessage
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+
 	window_stack_push(s_menu_window, true);
 }
-
 
 static void deinit(){
 	// Destoy main window
 	window_destroy(s_menu_window);
+	window_destroy(s_result_window);
+	window_destroy(s_list_window);
 }
 
 int main(void) {
