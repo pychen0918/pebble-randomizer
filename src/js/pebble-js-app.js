@@ -37,6 +37,8 @@ function locationSuccess(pos){
 			// It is possible that google returned with error page
 			try{
 				json = JSON.parse(responseText);
+				// Parse success, use first item as result
+				//dictionary[0] = "Success";
 				// Parse and store the food info
 				for(key in json.results){
 					dictionary[key] = json.results[key].name;
