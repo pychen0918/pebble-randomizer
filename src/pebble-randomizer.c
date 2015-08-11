@@ -2,9 +2,13 @@
 #define MAIN_MENU_ROWS	2
 #define LIST_MENU_ROWS  20
 #define RESULT_AGE_TIME	600
+#define SELECT_OPTION_RANDOM	0
+#define SELECT_OPTION_LIST	1
+#define MAIN_MENU_TEXT_LENGTH	64
+#define LIST_MENU_TEXT_LENGTH	128
 
-static char main_menu_text[MAIN_MENU_ROWS][16] = {"Random!","List"};
-static char list_menu_text[LIST_MENU_ROWS][64];
+static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
+static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];
 static int num_of_list_items;  // number of the returned items
 
 // The main menu with "Random" and "List" options
@@ -28,6 +32,9 @@ static time_t last_query_time;
 
 // Is query on going?
 static bool is_querying;
+
+// The selected option while waiting
+static int select_option;
 
 static void send_query(void){
 	DictionaryIterator *iter;
@@ -63,6 +70,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
+	select_option = cell_index->row;
 	// Do we have the valid result?
 	now = time(NULL);
 	if(last_query_time > 0 && ((now - last_query_time) < RESULT_AGE_TIME)){
@@ -118,7 +126,6 @@ static void main_window_unload(Window *window) {
 }
 
 static void result_window_load(Window *window) {
-	static char result[16];
 	int index;
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
@@ -127,14 +134,14 @@ static void result_window_load(Window *window) {
 
 	index = rand()%num_of_list_items;
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Random index:%d", index);
-	strncpy(result, list_menu_text[index], sizeof(result));
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "item: %s", list_menu_text[index]);
 
 	s_result_text_layer = text_layer_create(bounds);
 	text_layer_set_font(s_result_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_result_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_text_layer, GColorClear);
 	text_layer_set_text_color(s_result_text_layer, GColorBlack);
-	text_layer_set_text(s_result_text_layer, result);
+	text_layer_set_text(s_result_text_layer, list_menu_text[index]);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_text_layer));
 }
 
@@ -231,10 +238,15 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	}
 
 	// Check current window
-	// If we are waiting, display the list window
+	// If we are waiting, display the list or result window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		window_stack_push(s_list_window, true);
+		if(select_option == SELECT_OPTION_RANDOM)
+			window_stack_push(s_result_window, true);
+		else if(select_option == SELECT_OPTION_LIST)
+			window_stack_push(s_list_window, true);
+		else
+			window_stack_push(s_list_window, true);
 		window_stack_remove(s_wait_window, false);
 	}
 }
