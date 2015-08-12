@@ -9,6 +9,9 @@
   "watchapp": {
     "watchface": false
   },
+  "capabilities": [
+    "location"
+  ],
   "appKeys": {
     "dummy": 0
   },
