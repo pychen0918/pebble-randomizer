@@ -38,14 +38,13 @@ function locationSuccess(pos){
 		" head=" + pos.coords.heading +
 		" speed=" + pos.coords.speed
 		);
-	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" + 
-		"location=" + pos.coords.latitude + "," + pos.coords.longitude + 
-		"&radius=" + "500" + 
-		"&types=" + "food" + 
-		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
-/*
-	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=500&types=food&name=cruise&key=AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
-*/
+	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
+		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
+		"&radius=" + "1000" +
+		"&types=" + "restaurant" +
+		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s" +
+		"&opennow";
+
 	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
