@@ -7,6 +7,27 @@ function xhrRequest(url, type, callback) {
 	xhr.send();
 };
 
+function getDistance(lat1, lon1, lat2, lon2) {
+// Calculate distance by using approximation
+	var R = 6731009;  // earth radius in meters
+	var a = (lat1 - lat2)*(Math.PI / 180);
+	var b = Math.cos((lat1+lat2)*(Math.PI/180)/2) * (lon1 - lon2)*(Math.PI/180);
+
+	return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters
+}
+
+function getDirection(lat1, lon1, lat2, lon2) {
+// Calculate direction. 
+// (lat1, lon1) is current position, and (lat2, lon2) is target position
+	var directionName = ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"];
+	var t = Math.atan2(lon2-lon1, lat2-lat1)*(180/Math.PI);
+	var index = Math.round(t / 45);
+	if(index < 0)
+		index = index+8;
+
+	return directionName[index];
+}
+
 function locationSuccess(pos){
 	console.log("Location success:" + 
 		" lat=" + pos.coords.latitude +
@@ -32,15 +53,24 @@ function locationSuccess(pos){
 			var json;
 			var key;
 			var dictionary = {};
+			var distance, lat, lon, direction;
 			
 			// Parse response with exception handle
 			// It is possible that google returned with error page
 			try{
 				json = JSON.parse(responseText);
-				// Parse and store the food info
+				// Parse and store the food info (name, distance, direction)
 				for(key in json.results){
+					lat = json.results[key].geometry.location.lat;
+					lon = json.results[key].geometry.location.lng;
+					distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
+					direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
+
+					console.log(key + 
+						    " name: " + json.results[key].name + 
+						    " distance: " + distance + 
+						    " direction: " + direction);
 					dictionary[key] = json.results[key].name;
-					//console.log(key+" name: " + json.results[key].name);
 					//console.log(key+" name: " + dictionary[key]);
 				}
 				console.log("List complete");
