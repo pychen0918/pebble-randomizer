@@ -38,7 +38,6 @@ static int select_option;
 
 static void send_query(void){
 	DictionaryIterator *iter;
-	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, 0, 0);  // don't care about the content
 	app_message_outbox_send();
@@ -307,7 +306,7 @@ static void init(){
 	app_message_register_inbox_dropped(inbox_dropped_callback);
 	app_message_register_outbox_failed(outbox_failed_callback);
 	app_message_register_outbox_sent(outbox_sent_callback);
-
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 	// Send AppMessage to retrieve location information
 	// XXX: always failed. why?
 	//send_query();
