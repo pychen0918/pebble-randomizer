@@ -37,8 +37,6 @@ function locationSuccess(pos){
 			// It is possible that google returned with error page
 			try{
 				json = JSON.parse(responseText);
-				// Parse success, use first item as result
-				//dictionary[0] = "Success";
 				// Parse and store the food info
 				for(key in json.results){
 					dictionary[key] = json.results[key].name;
@@ -50,7 +48,6 @@ function locationSuccess(pos){
 			catch(e){
 				console.log("Error while parsing response: ");
 				console.log(responseText);
-				dictionary[0] = "Cannot get location information";
 			}
 
 			// Send to Pebble
@@ -67,7 +64,17 @@ function locationSuccess(pos){
 }
 
 function locationError(err){
+	var dictionary = {};
+	// timeout, send empty dictionary back
 	console.log("Location error: code=" + err.code + " msg=" + err.message);
+	Pebble.sendAppMessage(dictionary,
+		function(e) {
+			console.log("List sent to Pebble successfully!");
+		},
+		function(e) {
+			console.log("Error sending list info to Pebble!");
+		}
+	);
 }
 
 

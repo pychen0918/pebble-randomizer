@@ -199,41 +199,28 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	// Reset flag
 	is_querying = false;
 
-	// The first item stored query result and error message
-	APP_LOG(APP_LOG_LEVEL_INFO, "first entry: %s", t->value->cstring);
-	//if(!strcmp("Success", t->value->cstring)){
-	if(1){
-		APP_LOG(APP_LOG_LEVEL_INFO, "Success");
-		// successfully retrived query result
-		// store the list
+	// store the list
+	t = dict_read_next(iterator);
+	while(t != NULL && i < LIST_MENU_ROWS) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "Name: %s", t->value->cstring);
+		strncpy(list_menu_text[i], t->value->cstring, sizeof(list_menu_text[i]));
+		// Look for next item
+		i++;
 		t = dict_read_next(iterator);
-		while(t != NULL && i < LIST_MENU_ROWS) {
-			APP_LOG(APP_LOG_LEVEL_INFO, "Name: %s", t->value->cstring);
-			strncpy(list_menu_text[i], t->value->cstring, sizeof(list_menu_text[i]));
-			// Look for next item
-			i++;
-			t = dict_read_next(iterator);
-		}
-		num_of_list_items = i;
+	}
+	num_of_list_items = i;
 
-		// Handle other error situation
-		if(num_of_list_items == 0){
-			// query is successfully returned, but no result
-			APP_LOG(APP_LOG_LEVEL_INFO, "No result!");
-			strncpy(list_menu_text[i], "No result!", sizeof(list_menu_text[i]));
-			num_of_list_items = 1;
-		}
-		else{
-			// we have correct information, record the query time
-			APP_LOG(APP_LOG_LEVEL_INFO, "We have %d result", num_of_list_items);
-			last_query_time = time(NULL);
-		}
+	// Handle other error situation
+	if(num_of_list_items == 0){
+		// query is successfully returned, but no result
+		APP_LOG(APP_LOG_LEVEL_INFO, "No result!");
+		strncpy(list_menu_text[i], "No result!", sizeof(list_menu_text[i]));
+		num_of_list_items = 1;
 	}
 	else{
-		// query failed, show error message
-		APP_LOG(APP_LOG_LEVEL_INFO, "Failed: %s", t->value->cstring);
-		strncpy(list_menu_text[i], t->value->cstring, sizeof(list_menu_text[i]));
-		num_of_list_items = 1;
+		// we have correct information, record the query time
+		APP_LOG(APP_LOG_LEVEL_INFO, "We have %d result", num_of_list_items);
+		last_query_time = time(NULL);
 	}
 
 	// Check current window
