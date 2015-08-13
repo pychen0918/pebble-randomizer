@@ -68,9 +68,9 @@ function locationSuccess(pos){
 					direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
 					console.log(" key: " + key + 
 						    " name: " + json.results[i].name + 
-						    " distance: " + distance + 
-						    " direction: " + direction);
-					dictionary[key] = json.results[i].name + ";" + distance + ";" + direction + ";";
+						    " direction: " + direction + 
+						    " distance: " + distance);
+					dictionary[key] = json.results[i].name + "|" + direction + " " + distance;
 					key++;
 				}
 				console.log("List complete");

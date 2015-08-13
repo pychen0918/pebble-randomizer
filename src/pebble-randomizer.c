@@ -6,10 +6,12 @@
 #define SELECT_OPTION_RANDOM	0
 #define SELECT_OPTION_LIST	1
 #define MAIN_MENU_TEXT_LENGTH	64
-#define LIST_MENU_TEXT_LENGTH	256
+#define LIST_MENU_TEXT_LENGTH	128
+#define LIST_MENU_SUB_TEXT_LENGTH	16
 
 static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
-static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];
+static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restaurant name
+static char list_menu_sub_text[LIST_MENU_ROWS][LIST_MENU_SUB_TEXT_LENGTH];  // Direction and distance
 static char query_result[32];
 static int num_of_list_items;  // number of the returned items
 
@@ -60,9 +62,10 @@ static uint16_t list_menu_get_num_rows_callback(struct MenuLayer *menulayer, uin
 }
 
 static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char* text = list_menu_text[cell_index->row];
+	char *text = list_menu_text[cell_index->row];
+	char *sub_text = list_menu_sub_text[cell_index->row];
 
-	menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
+	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
 }
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
@@ -192,6 +195,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	Tuple *t = dict_read_first(iterator);
 	Window *top_window;
 	int index;
+	char *l, *r, buf[256];
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
 	is_querying = false;  // reset the flag
@@ -206,7 +210,19 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 				break;
 			default:
 				if((t->key >= 1) && (t->key < (MAX_DATA_NUMBER+1))){
-					strncpy(list_menu_text[index], t->value->cstring, sizeof(list_menu_text[index]));
+					// value string format: Restaurant name|Direction Distance
+					// looks like the SDK has no strtok(). Cut it myself
+					strncpy(buf, t->value->cstring, sizeof(buf));
+					l = r = buf;
+					while(*r!='|')
+						r++;
+					*r = '\0';
+					r++;
+
+					strncpy(list_menu_text[index], l, sizeof(list_menu_text[index]));
+					strncpy(list_menu_sub_text[index], r, sizeof(list_menu_sub_text[index]));
+					strncat(list_menu_sub_text[index], " meters", 7);
+					APP_LOG(APP_LOG_LEVEL_DEBUG, "index:%d menu_text:%s menu_sub_text:%s", index, list_menu_text[index], list_menu_sub_text[index]);
 					index++;
 				}
 				else
