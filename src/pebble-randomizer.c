@@ -1,14 +1,16 @@
 #include <pebble.h>
-#define MAIN_MENU_ROWS	2
-#define LIST_MENU_ROWS  20
-#define RESULT_AGE_TIME	600
+#define MAX_DATA_NUMBER 20 		// Max number of returned data
+#define MAIN_MENU_ROWS	2  		// Random and list
+#define LIST_MENU_ROWS  MAX_DATA_NUMBER
+#define RESULT_AGE_TIME	300 		// How long the list is valid in seconds
 #define SELECT_OPTION_RANDOM	0
 #define SELECT_OPTION_LIST	1
 #define MAIN_MENU_TEXT_LENGTH	64
-#define LIST_MENU_TEXT_LENGTH	128
+#define LIST_MENU_TEXT_LENGTH	256
 
 static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
 static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];
+static char query_result[32];
 static int num_of_list_items;  // number of the returned items
 
 // The main menu with "Random" and "List" options
@@ -41,7 +43,6 @@ static void send_query(void){
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, 0, 0);  // don't care about the content
 	app_message_outbox_send();
-	is_querying = true;
 }
 
 static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
@@ -96,7 +97,6 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 	}
 
 }
-
 
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 // Currently do nothing. Consider to provide detailed information in the future.
@@ -168,7 +168,6 @@ static void list_window_unload(Window *window) {
 	menu_layer_destroy(s_list_menu_layer);
 }
 
-
 static void wait_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
@@ -192,35 +191,41 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	// Read first item
 	Tuple *t = dict_read_first(iterator);
 	Window *top_window;
-	int i = 0;
+	int index;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
-
-	// Reset flag
-	is_querying = false;
+	is_querying = false;  // reset the flag
 
 	// store the list
-	t = dict_read_next(iterator);
-	while(t != NULL && i < LIST_MENU_ROWS) {
-		APP_LOG(APP_LOG_LEVEL_INFO, "Name: %s", t->value->cstring);
-		strncpy(list_menu_text[i], t->value->cstring, sizeof(list_menu_text[i]));
-		// Look for next item
-		i++;
+	index = 0;
+	while(t != NULL) {
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "key: %d Data: %s", (int)t->key, t->value->cstring);
+		switch(t->key){
+			case 0:
+				strncpy(query_result, t->value->cstring, sizeof(query_result));
+				break;
+			default:
+				if((t->key >= 1) && (t->key < (MAX_DATA_NUMBER+1))){
+					strncpy(list_menu_text[index], t->value->cstring, sizeof(list_menu_text[index]));
+					index++;
+				}
+				else
+					APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);	
+				break;
+		}
 		t = dict_read_next(iterator);
 	}
-	num_of_list_items = i;
+	num_of_list_items = index;
 
-	// Handle other error situation
-	if(num_of_list_items == 0){
-		// query is successfully returned, but no result
-		APP_LOG(APP_LOG_LEVEL_INFO, "No result!");
-		strncpy(list_menu_text[i], "No result!", sizeof(list_menu_text[i]));
-		num_of_list_items = 1;
+	// Determine if query is success or not
+	if(!strncmp(query_result, "Success", 7)){
+		// we have correct information, record the query time
+		APP_LOG(APP_LOG_LEVEL_INFO, "status: %s, we have %d result", query_result, num_of_list_items);
+		last_query_time = time(NULL);
 	}
 	else{
-		// we have correct information, record the query time
-		APP_LOG(APP_LOG_LEVEL_INFO, "We have %d result", num_of_list_items);
-		last_query_time = time(NULL);
+		// query failed, do not update last_query_time
+		APP_LOG(APP_LOG_LEVEL_INFO, "status: %s", query_result);
 	}
 
 	// Check current window
@@ -244,6 +249,7 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 	APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+	is_querying = true;
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {

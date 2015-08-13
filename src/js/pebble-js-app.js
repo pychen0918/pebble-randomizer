@@ -42,14 +42,15 @@ function locationSuccess(pos){
 		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
 		"&radius=" + "1000" +
 		"&types=" + "restaurant" +
-		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s" +
-		"&opennow";
+		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
+//		"&opennow";
 
 	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
 		function(responseText) {
 			var json;
+			var i;
 			var key;
 			var dictionary = {};
 			var distance, lat, lon, direction;
@@ -59,24 +60,29 @@ function locationSuccess(pos){
 			try{
 				json = JSON.parse(responseText);
 				// Parse and store the food info (name, distance, direction)
-				for(key in json.results){
-					lat = json.results[key].geometry.location.lat;
-					lon = json.results[key].geometry.location.lng;
+				key = 1;
+				for(i in json.results){
+					lat = json.results[i].geometry.location.lat;
+					lon = json.results[i].geometry.location.lng;
 					distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
 					direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
-
-					console.log(key + 
-						    " name: " + json.results[key].name + 
+					console.log(" key: " + key + 
+						    " name: " + json.results[i].name + 
 						    " distance: " + distance + 
 						    " direction: " + direction);
-					dictionary[key] = json.results[key].name;
-					//console.log(key+" name: " + dictionary[key]);
+					dictionary[key] = json.results[i].name + ";" + distance + ";" + direction + ";";
+					key++;
 				}
 				console.log("List complete");
+				if(key == 1)  // didn't get any result
+					dictionary[0] = "No result";
+				else
+					dictionary[0] = "Success";
 			} 
 			catch(e){
 				console.log("Error while parsing response: ");
 				console.log(responseText);
+				dictionary[0] = "Received Invalid Data";
 			}
 
 			// Send to Pebble
@@ -94,8 +100,9 @@ function locationSuccess(pos){
 
 function locationError(err){
 	var dictionary = {};
-	// timeout, send empty dictionary back
+	// usua
 	console.log("Location error: code=" + err.code + " msg=" + err.message);
+	dictionary[0] = "Cannot get current location";
 	Pebble.sendAppMessage(dictionary,
 		function(e) {
 			console.log("List sent to Pebble successfully!");
@@ -111,7 +118,7 @@ function getLocation() {
 	navigator.geolocation.getCurrentPosition(
 	locationSuccess,
 	locationError,
-	{enableHighAccuracy: false, timeout: 30000, maximumAge: 600000}
+	{enableHighAccuracy: false, timeout: 30000, maximumAge: 120000}
 	);
 }
 
