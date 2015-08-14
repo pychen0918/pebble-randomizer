@@ -9,6 +9,12 @@
 #define LIST_MENU_TEXT_LENGTH	128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 18
+#define WAIT_TEXT_LAYER_HEIGHT	50
+#define WAIT_ANIMATION_TIMER_DELTA	33
+#define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
+#define WAIT_ANIMATION_BAR_RIGHT_MARGIN	10
+#define WAIT_ANIMATION_BAR_HEIGHT	6
+#define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
 
 static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
 static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restaurant name
@@ -17,6 +23,8 @@ static char list_menu_header_text[32] = "Restaurants";
 static char query_result[32];
 static char random_result[LIST_MENU_TEXT_LENGTH];
 static int num_of_list_items;  // number of the returned items
+static AppTimer *s_wait_animation_timer;
+static int s_wait_animation_counter = 0;
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -33,6 +41,7 @@ static MenuLayer *s_list_menu_layer;
 // The waiting window
 static Window *s_wait_window;
 static TextLayer *s_wait_text_layer;
+static Layer *s_wait_layer;
 
 // Last query time
 static time_t last_query_time;
@@ -101,7 +110,6 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
-	int index;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
@@ -200,23 +208,68 @@ static void list_window_unload(Window *window) {
 	menu_layer_destroy(s_list_menu_layer);
 }
 
+static void wait_animation_next_timer(void);
+
+static void wait_animation_timer_callback(void *context){
+	s_wait_animation_counter += (s_wait_animation_counter < 100) ? 1 : -100;
+	layer_mark_dirty(s_wait_layer);
+	wait_animation_next_timer();
+}
+
+static void wait_animation_next_timer(void){
+	s_wait_animation_timer = app_timer_register(WAIT_ANIMATION_TIMER_DELTA, wait_animation_timer_callback, NULL);
+}
+
+static void wait_layer_update_proc(Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+	int bar_max_length = (bounds.size.w - WAIT_ANIMATION_BAR_LEFT_MARGIN - WAIT_ANIMATION_BAR_RIGHT_MARGIN);
+	int y_pos = (bounds.size.h / 2);
+
+	if(bar_max_length < 0){
+		bar_max_length = bounds.size.w;
+	}
+
+	int width = (int)(float)(((float)s_wait_animation_counter / 100.0F) * bar_max_length);
+	graphics_context_set_stroke_color(ctx, GColorBlack);
+	graphics_fill_rect(ctx, GRect(WAIT_ANIMATION_BAR_LEFT_MARGIN, y_pos, width, WAIT_ANIMATION_BAR_HEIGHT), 
+			   WAIT_ANIMATION_BAR_RADIUS, GCornersAll);
+}
+
 static void wait_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Wait load");
 
-	s_wait_text_layer = text_layer_create(bounds);
+	s_wait_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, WAIT_TEXT_LAYER_HEIGHT));
+	s_wait_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y + WAIT_TEXT_LAYER_HEIGHT, 
+					  bounds.size.w, bounds.size.w - WAIT_TEXT_LAYER_HEIGHT));
+	
 	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
 	text_layer_set_background_color(s_wait_text_layer, GColorClear);
 	text_layer_set_text_color(s_wait_text_layer, GColorBlack);
 	text_layer_set_text(s_wait_text_layer, "Waiting");
+	layer_set_update_proc(s_wait_layer, wait_layer_update_proc);
+
 	layer_add_child(window_layer, text_layer_get_layer(s_wait_text_layer));
+	layer_add_child(window_layer, s_wait_layer);
 }
 
 static void wait_window_unload(Window *window) {
-	text_layer_destroy(s_wait_text_layer);
+	layer_destroy(s_wait_layer);
+}
+
+static void wait_window_appear(Window *window) {
+	s_wait_animation_counter = 0;
+	wait_animation_next_timer();
+}
+
+static void wait_window_disappear(Window *window) {
+	if(s_wait_animation_timer){
+		app_timer_cancel(s_wait_animation_timer);
+		s_wait_animation_timer = NULL;
+	}
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
@@ -241,7 +294,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 			default:
 				if((t->key >= 1) && (t->key < (MAX_DATA_NUMBER+1))){
 					// value string format: Restaurant name|Direction Distance
-					// looks like the SDK has no strtok(). Cut it myself
 					strncpy(buf, t->value->cstring, sizeof(buf));
 					l = r = buf;
 					while(*r!='|')
@@ -315,28 +367,30 @@ static void init(){
 	s_main_window = window_create();
 	window_set_window_handlers(s_main_window, (WindowHandlers){
 		.load = main_window_load,
-		.unload = main_window_unload,
+		.unload = main_window_unload
 	});
 
 	// Create result window
 	s_result_window = window_create();
 	window_set_window_handlers(s_result_window, (WindowHandlers){
 		.load = result_window_load,
-		.unload = result_window_unload,
+		.unload = result_window_unload
 	});
 
 	// Create list window
 	s_list_window = window_create();
 	window_set_window_handlers(s_list_window, (WindowHandlers){
 		.load = list_window_load,
-		.unload = list_window_unload,
+		.unload = list_window_unload
 	});
 
 	// Create wait window
 	s_wait_window = window_create();
 	window_set_window_handlers(s_wait_window, (WindowHandlers){
+		.appear = wait_window_appear,
 		.load = wait_window_load,
 		.unload = wait_window_unload,
+		.disappear = wait_window_disappear
 	});
 
 	// Register AppMessage callbacks
