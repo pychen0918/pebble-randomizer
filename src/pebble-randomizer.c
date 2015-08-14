@@ -9,7 +9,7 @@
 #define LIST_MENU_TEXT_LENGTH	128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 18
-#define WAIT_TEXT_LAYER_HEIGHT	50
+#define WAIT_TEXT_LAYER_HEIGHT	32
 #define WAIT_ANIMATION_TIMER_DELTA	33
 #define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
 #define WAIT_ANIMATION_BAR_RIGHT_MARGIN	10
@@ -258,6 +258,7 @@ static void wait_window_load(Window *window) {
 
 static void wait_window_unload(Window *window) {
 	layer_destroy(s_wait_layer);
+	text_layer_destroy(s_wait_text_layer);
 }
 
 static void wait_window_appear(Window *window) {
