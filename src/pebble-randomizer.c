@@ -15,6 +15,7 @@ static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restauran
 static char list_menu_sub_text[LIST_MENU_ROWS][LIST_MENU_SUB_TEXT_LENGTH];  // Direction and distance
 static char list_menu_header_text[32] = "Restaurants";
 static char query_result[32];
+static char random_result[LIST_MENU_TEXT_LENGTH];
 static int num_of_list_items;  // number of the returned items
 
 // The main menu with "Random" and "List" options
@@ -80,6 +81,7 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
+	int index;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
@@ -90,6 +92,8 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 		// we have valid list, show them
 		switch(cell_index->row){
 			case 0:
+				index = rand()%num_of_list_items;
+				strncpy(random_result, list_menu_text[index], sizeof(random_result));
 				window_stack_push(s_result_window, true);
 				break;
 			case 1:
@@ -138,22 +142,17 @@ static void main_window_unload(Window *window) {
 }
 
 static void result_window_load(Window *window) {
-	int index;
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
-
-	index = rand()%num_of_list_items;
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Random index:%d", index);
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "item: %s", list_menu_text[index]);
 
 	s_result_text_layer = text_layer_create(bounds);
 	text_layer_set_font(s_result_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_result_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_text_layer, GColorClear);
 	text_layer_set_text_color(s_result_text_layer, GColorBlack);
-	text_layer_set_text(s_result_text_layer, list_menu_text[index]);
+	text_layer_set_text(s_result_text_layer, random_result);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_text_layer));
 }
 
@@ -207,6 +206,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	Tuple *t = dict_read_first(iterator);
 	Window *top_window;
 	int index;
+	bool successFlag = false;
 	char *l, *r, buf[256];
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
@@ -247,12 +247,23 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
 	// Determine if query is success or not
 	if(!strncmp(query_result, "Success", 7)){
-		// we have correct information, record the query time
-		APP_LOG(APP_LOG_LEVEL_INFO, "status: %s, we have %d result", query_result, num_of_list_items);
-		last_query_time = time(NULL);
+		if(num_of_list_items == 0){
+			//query is success, but no result. We still consider it a fail
+			successFlag = false;
+			APP_LOG(APP_LOG_LEVEL_INFO, "No result!");
+			// update query result for later display
+			strncpy(query_result, "No result!", sizeof(query_result));
+		}
+		else{
+			// we have correct information, record the query time
+			successFlag = true;
+			APP_LOG(APP_LOG_LEVEL_INFO, "status: %s, we have %d result", query_result, num_of_list_items);
+			last_query_time = time(NULL);
+		}
 	}
 	else{
 		// query failed, do not update last_query_time
+		successFlag = false;
 		APP_LOG(APP_LOG_LEVEL_INFO, "status: %s", query_result);
 	}
 
@@ -260,12 +271,20 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	// If we are waiting, display the list or result window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		if(select_option == SELECT_OPTION_RANDOM)
+		if(successFlag){
+			if(select_option == SELECT_OPTION_RANDOM){
+				index = rand()%num_of_list_items;
+				strncpy(random_result, list_menu_text[index], sizeof(random_result));
+				APP_LOG(APP_LOG_LEVEL_DEBUG, "random result: %d %s", index, random_result);
+				window_stack_push(s_result_window, true);
+			}
+			else if(select_option == SELECT_OPTION_LIST)
+				window_stack_push(s_list_window, true);
+		}
+		else{
+			strncpy(random_result, query_result, sizeof(random_result));
 			window_stack_push(s_result_window, true);
-		else if(select_option == SELECT_OPTION_LIST)
-			window_stack_push(s_list_window, true);
-		else
-			window_stack_push(s_list_window, true);
+		}
 		window_stack_remove(s_wait_window, false);
 	}
 }
