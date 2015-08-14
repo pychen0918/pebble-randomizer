@@ -42,8 +42,8 @@ function locationSuccess(pos){
 		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
 		"&radius=" + "1000" +
 		"&types=" + "restaurant" +
-		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
-//		"&opennow";
+		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s" +
+		"&opennow";
 
 	console.log("url: " + url);
 
@@ -75,7 +75,7 @@ function locationSuccess(pos){
 				}
 				console.log("List complete");
 				if(key == 1)  // didn't get any result
-					dictionary[0] = "No result";
+					dictionary[0] = "No result!";
 				else
 					dictionary[0] = "Success";
 			} 
@@ -100,7 +100,6 @@ function locationSuccess(pos){
 
 function locationError(err){
 	var dictionary = {};
-	// usua
 	console.log("Location error: code=" + err.code + " msg=" + err.message);
 	dictionary[0] = "Cannot get current location";
 	Pebble.sendAppMessage(dictionary,
@@ -118,7 +117,7 @@ function getLocation() {
 	navigator.geolocation.getCurrentPosition(
 	locationSuccess,
 	locationError,
-	{enableHighAccuracy: false, timeout: 30000, maximumAge: 120000}
+	{enableHighAccuracy: false, timeout: 20000, maximumAge: 120000}
 	);
 }
 
