@@ -278,10 +278,10 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 		}
 		else if(select_option == SELECT_OPTION_LIST){
 			// if we have failed query, still display result window with error message
-			if(successFlag)
-				window_stack_push(s_list_window, true);
-			else
+			if(!successFlag)
 				generate_random_result_window();
+			else
+				window_stack_push(s_list_window, true);
 		}
 		window_stack_remove(s_wait_window, false);
 	}
