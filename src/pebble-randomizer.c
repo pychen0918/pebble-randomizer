@@ -50,6 +50,26 @@ static void send_query(void){
 	app_message_outbox_send();
 }
 
+// A wrapped subroutine to determine the query status
+// and generate result from list, or error message if query failed
+static void generate_random_result_window(void){
+	int index = 0;
+
+	// Determine if we have valid query result
+	if(!strncmp(query_result, "Success", 7)){
+		index = rand()%num_of_list_items;
+		strncpy(random_result, list_menu_text[index], sizeof(random_result));
+	}
+	else{
+		if(strlen(query_result)>0)
+			strncpy(random_result, query_result, sizeof(random_result));
+		else
+			strncpy(random_result, "No result!", sizeof(random_result));
+	}
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Random result: %d %s", index, random_result);
+	window_stack_push(s_result_window, true);
+}
+
 static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
 	return MAIN_MENU_ROWS;
 }
@@ -92,9 +112,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 		// we have valid list, show them
 		switch(cell_index->row){
 			case 0:
-				index = rand()%num_of_list_items;
-				strncpy(random_result, list_menu_text[index], sizeof(random_result));
-				window_stack_push(s_result_window, true);
+				generate_random_result_window();
 				break;
 			case 1:
 				window_stack_push(s_list_window, true);
@@ -244,46 +262,26 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 		t = dict_read_next(iterator);
 	}
 	num_of_list_items = index;
-
-	// Determine if query is success or not
+	
+	// Update last query time if we have success query
 	if(!strncmp(query_result, "Success", 7)){
-		if(num_of_list_items == 0){
-			//query is success, but no result. We still consider it a fail
-			successFlag = false;
-			APP_LOG(APP_LOG_LEVEL_INFO, "No result!");
-			// update query result for later display
-			strncpy(query_result, "No result!", sizeof(query_result));
-		}
-		else{
-			// we have correct information, record the query time
-			successFlag = true;
-			APP_LOG(APP_LOG_LEVEL_INFO, "status: %s, we have %d result", query_result, num_of_list_items);
-			last_query_time = time(NULL);
-		}
-	}
-	else{
-		// query failed, do not update last_query_time
-		successFlag = false;
-		APP_LOG(APP_LOG_LEVEL_INFO, "status: %s", query_result);
+		last_query_time = time(NULL);
+		successFlag = true;
 	}
 
 	// Check current window
 	// If we are waiting, display the list or result window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		if(successFlag){
-			if(select_option == SELECT_OPTION_RANDOM){
-				index = rand()%num_of_list_items;
-				strncpy(random_result, list_menu_text[index], sizeof(random_result));
-				APP_LOG(APP_LOG_LEVEL_DEBUG, "random result: %d %s", index, random_result);
-				window_stack_push(s_result_window, true);
-			}
-			else if(select_option == SELECT_OPTION_LIST)
-				window_stack_push(s_list_window, true);
+		if(select_option == SELECT_OPTION_RANDOM){
+			generate_random_result_window();
 		}
-		else{
-			strncpy(random_result, query_result, sizeof(random_result));
-			window_stack_push(s_result_window, true);
+		else if(select_option == SELECT_OPTION_LIST){
+			// if we have failed query, still display result window with error message
+			if(successFlag)
+				window_stack_push(s_list_window, true);
+			else
+				generate_random_result_window();
 		}
 		window_stack_remove(s_wait_window, false);
 	}
@@ -347,9 +345,6 @@ static void init(){
 	app_message_register_outbox_failed(outbox_failed_callback);
 	app_message_register_outbox_sent(outbox_sent_callback);
 	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
-	// Send AppMessage to retrieve location information
-	// XXX: always failed. why?
-	//send_query();
 
 	// Display main menu
 	window_stack_push(s_main_window, true);
