@@ -8,9 +8,11 @@
 #define MAIN_MENU_TEXT_LENGTH	64
 #define LIST_MENU_TEXT_LENGTH	128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
-#define LIST_MENU_HEADER_HEIGHT 18
+#define LIST_MENU_HEADER_HEIGHT 	18
 #define SETTING_MENU_TEXT_LENGTH	64
-#define WAIT_TEXT_LAYER_HEIGHT	32
+#define SETTING_MENU_SUB_TEXT_LENGTH	64
+#define SETTING_MENU_HEADER_HEIGHT	18
+#define WAIT_TEXT_LAYER_HEIGHT		32
 #define WAIT_ANIMATION_TIMER_DELTA	33
 #define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
 #define WAIT_ANIMATION_BAR_RIGHT_MARGIN	10
@@ -27,6 +29,7 @@ static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","
 static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restaurant name
 static char list_menu_sub_text[LIST_MENU_ROWS][LIST_MENU_SUB_TEXT_LENGTH];  // Direction and distance
 static char list_menu_header_text[32] = "Restaurants";
+static char setting_main_menu_header_text[32] = "Options";
 static char setting_main_menu_text[3][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
 static char query_result[32];
 static char random_result[LIST_MENU_TEXT_LENGTH];
@@ -35,12 +38,21 @@ static AppTimer *s_wait_animation_timer;
 static int s_wait_animation_counter = 0;
 
 static uint32_t s_search_data;  // it is radius << 16 | type << 8 | opennow
-//static char search_distance_query_text[][32] = {"500", "1000", "5000", "10000"};
-//static char search_distance_display_text[][32] = {"500 M", "1 KM", "5 KM", "10 KM"};
-//static char search_type_query_text[][32] = {"restaurant", "food"};
-//static char search_type_display_text[][32] = {"Restaurants", "Foods"};
-//static char search_opennow_query_text[][32] = {"", "opennow"};
-//static char search_opennow_display_text[][32] = {"No", "Yes"};  // search only opening store?
+static char search_distance_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500", "1000", "5000", "10000"};
+static char search_distance_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
+static char search_type_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"restaurant", "food"};
+static char search_type_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Restaurants", "Foods"};
+static char search_opennow_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"", "opennow"};
+static char search_opennow_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};  // search only open store?
+
+// Last query time
+static time_t last_query_time;
+// Is query on going?
+static bool is_querying;
+// The selected option while waiting
+static int select_option;
+// The selected setting option
+static int select_setting_option;
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -56,6 +68,7 @@ static MenuLayer *s_list_menu_layer;
 
 // The settings window
 static Window *s_setting_window;
+static Window *s_setting_sub_window;
 static MenuLayer *s_setting_main_menu_layer;
 static MenuLayer *s_setting_sub_menu_layer;
 
@@ -63,15 +76,6 @@ static MenuLayer *s_setting_sub_menu_layer;
 static Window *s_wait_window;
 static TextLayer *s_wait_text_layer;
 static Layer *s_wait_layer;
-
-// Last query time
-static time_t last_query_time;
-
-// Is query on going?
-static bool is_querying;
-
-// The selected option while waiting
-static int select_option;
 
 static uint32_t compute_search_data(uint8_t radius, uint8_t type, uint8_t opennow){
 	return (radius << 16) | (type << 8) | opennow;
@@ -125,6 +129,7 @@ static void main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
+	bool valid_time = false;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
@@ -132,28 +137,36 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 	// Do we have the valid result?
 	now = time(NULL);
 	if(last_query_time > 0 && ((now - last_query_time) < RESULT_AGE_TIME)){
-		// we have valid list, show them
-		switch(cell_index->row){
-			case 0:
-				generate_random_result_window();
-				break;
-			case 1:
-				window_stack_push(s_list_window, true);
-				break;
-			default:
-				APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown selection");
-				break;
-		}
-		
-	}
-	else{
-		// Either we didn't send query before, it is timeout, or we are still waiting for the result
-		if(is_querying == false){
-			send_query();
-		}
-		window_stack_push(s_wait_window, true);
+		valid_time = true;
 	}
 
+	switch(cell_index->row){
+		case 0:  // Random
+			if(valid_time)
+				generate_random_result_window();
+			else{
+				if(is_querying == false)
+					send_query();
+				window_stack_push(s_wait_window, true);
+			}
+			break;
+		case 1:  // List
+			if(valid_time)
+				window_stack_push(s_list_window, true);
+			else{
+				if(is_querying == false)
+					send_query();
+				window_stack_push(s_wait_window, true);
+			}
+			break;
+		case 2:  // Setting
+			window_stack_push(s_setting_window, true);
+			break;
+		default:
+			APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown selection");
+			break;
+	}
+		
 }
 
 static void main_window_load(Window *window) {
@@ -242,10 +255,160 @@ static void result_window_unload(Window *window) {
 	text_layer_destroy(s_result_text_layer);
 }
 
+static uint16_t setting_main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
+	return sizeof(setting_main_menu_text)/sizeof(setting_main_menu_text[0]);
+}
+
+static int16_t setting_main_menu_get_header_height_callback(struct MenuLayer *menu_layer, uint16_t section_index, void *callback_context){
+	return SETTING_MENU_HEADER_HEIGHT;
+}
+
+static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
+	char *text = setting_main_menu_text[cell_index->row];
+	char *sub_text = NULL;
+	uint8_t radius, type, opennow;
+	get_search_options(s_search_data, &radius, &type, &opennow);
+	
+	switch(cell_index->row){
+		case 0:  // distance
+			sub_text = search_distance_display_text[radius];
+			break;
+		case 1:  // type
+			sub_text = search_type_display_text[type];
+			break;
+		case 2:  // opennow
+			sub_text = search_opennow_display_text[opennow];
+			break;
+		default:
+			break;
+	}
+
+	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
+}
+
+static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
+	menu_cell_basic_header_draw(ctx, cell_layer, setting_main_menu_header_text);
+}
+
+static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+	select_setting_option = cell_index->row;
+
+	window_stack_push(s_setting_sub_window, true);
+}
+
 static void setting_window_load(Window *window){
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+
+	APP_LOG(APP_LOG_LEVEL_INFO, "Settings load");
+	
+	s_setting_main_menu_layer = menu_layer_create(bounds);
+	menu_layer_set_callbacks(s_setting_main_menu_layer, NULL, (MenuLayerCallbacks){
+		.get_num_rows = setting_main_menu_get_num_rows_callback,
+		.draw_row = setting_main_menu_draw_row_handler,
+		.select_click = setting_main_menu_select_callback,
+		.get_header_height = setting_main_menu_get_header_height_callback,
+		.draw_header = setting_main_menu_draw_header_handler
+	});
+	menu_layer_set_click_config_onto_window(s_setting_main_menu_layer, window);
+	layer_add_child(window_layer, menu_layer_get_layer(s_setting_main_menu_layer));
 }
 
 static void setting_window_unload(Window *window){
+	menu_layer_destroy(s_setting_main_menu_layer);
+}
+
+static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
+	uint16_t ret = 0;
+	switch(select_setting_option){
+		case 0:  // distance
+			ret = sizeof(search_distance_display_text)/sizeof(search_distance_display_text[0]);
+			break;
+		case 1:  // type
+			ret = sizeof(search_type_display_text)/sizeof(search_type_display_text[0]);
+			break;
+		case 2:  // opennow
+			ret = sizeof(search_opennow_display_text)/sizeof(search_opennow_display_text[0]);
+			break;
+		default:
+			break;
+	}
+	return ret;
+}
+
+static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
+	char *text = NULL;
+	char *sub_text = "Marked";
+	uint8_t radius, type, opennow;
+	uint8_t selected_index = 0;  // the one that is selected previously by user
+	
+
+	get_search_options(s_search_data, &radius, &type, &opennow);
+
+	switch(select_setting_option){
+		case 0:  // distance
+			selected_index = radius;
+			text = search_distance_display_text[cell_index->row];
+			break;
+		case 1:  // type
+			selected_index = type;
+			text = search_type_display_text[cell_index->row];
+			break;
+		case 2:  // opennow
+			selected_index = opennow;
+			text = search_opennow_display_text[cell_index->row];
+			break;
+		default:
+			break;
+	}
+
+	if(cell_index->row == selected_index)  // TODO: Add marker icon
+		menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
+	else
+		menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
+}
+
+static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+// Once an item is selected, update search_data and close this sub_menu window
+	uint8_t radius, type, opennow;
+
+	get_search_options(s_search_data, &radius, &type, &opennow);
+	switch(select_setting_option){
+		case 0:  // distance
+			radius = cell_index->row;
+			break;
+		case 1:  // type
+			type = cell_index->row;
+			break;
+		case 2:  // opennow
+			opennow = cell_index->row;
+			break;
+		default:
+			break;
+	}
+	s_search_data = compute_search_data(radius, type, opennow);
+
+	window_stack_pop(true);
+}
+
+static void setting_sub_window_load(Window *window){
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+
+	APP_LOG(APP_LOG_LEVEL_INFO, "Settings sub window load");
+	
+	s_setting_sub_menu_layer = menu_layer_create(bounds);
+	menu_layer_set_callbacks(s_setting_sub_menu_layer, NULL, (MenuLayerCallbacks){
+		.get_num_rows = setting_sub_menu_get_num_rows_callback,
+		.draw_row = setting_sub_menu_draw_row_handler,
+		.select_click = setting_sub_menu_select_callback,
+	});
+	menu_layer_set_click_config_onto_window(s_setting_sub_menu_layer, window);
+	layer_add_child(window_layer, menu_layer_get_layer(s_setting_sub_menu_layer));
+}
+
+static void setting_sub_window_unload(Window *window){
+	menu_layer_destroy(s_setting_sub_menu_layer);
 }
 
 static void wait_animation_next_timer(void);
@@ -400,6 +563,11 @@ static void init(){
 	srand(time(NULL));
 
 	// Initialize variables
+	num_of_list_items = 0;
+	last_query_time = 0;
+	is_querying = false;
+	select_option = 0;
+	select_setting_option = 0;
 	if(persist_exists(PERSIST_KEY_SEARCH_DATA)){
 		s_search_data = persist_read_int(PERSIST_KEY_SEARCH_DATA);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "search_data=%u", (unsigned int)s_search_data);
@@ -435,6 +603,13 @@ static void init(){
 	window_set_window_handlers(s_setting_window, (WindowHandlers){
 		.load = setting_window_load,
 		.unload = setting_window_unload
+	});
+
+	// Create settings sub menu window
+	s_setting_sub_window = window_create();
+	window_set_window_handlers(s_setting_sub_window, (WindowHandlers){
+		.load = setting_sub_window_load,
+		.unload = setting_sub_window_unload
 	});
 
 	// Create wait window
