@@ -53,6 +53,8 @@ static bool is_querying;
 static int select_option;
 // The selected setting option
 static int select_setting_option;
+// If user have made changes
+static bool is_setting_changed;
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -129,20 +131,20 @@ static void main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
-	bool valid_time = false;
+	bool valid_result = false;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
 	select_option = cell_index->row;
 	// Do we have the valid result?
 	now = time(NULL);
-	if(last_query_time > 0 && ((now - last_query_time) < RESULT_AGE_TIME)){
-		valid_time = true;
+	if(last_query_time > 0 && ((now - last_query_time) < RESULT_AGE_TIME) && !is_setting_changed){
+		valid_result = true;
 	}
 
 	switch(cell_index->row){
 		case 0:  // Random
-			if(valid_time)
+			if(valid_result)
 				generate_random_result_window();
 			else{
 				if(is_querying == false)
@@ -151,7 +153,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 			}
 			break;
 		case 1:  // List
-			if(valid_time)
+			if(valid_result)
 				window_stack_push(s_list_window, true);
 			else{
 				if(is_querying == false)
@@ -342,7 +344,6 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 	uint8_t radius, type, opennow;
 	uint8_t selected_index = 0;  // the one that is selected previously by user
 	
-
 	get_search_options(s_search_data, &radius, &type, &opennow);
 
 	switch(select_setting_option){
@@ -371,7 +372,9 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 // Once an item is selected, update search_data and close this sub_menu window
 	uint8_t radius, type, opennow;
+	uint32_t old_search_data;
 
+	old_search_data = s_search_data;
 	get_search_options(s_search_data, &radius, &type, &opennow);
 	switch(select_setting_option){
 		case 0:  // distance
@@ -387,6 +390,12 @@ static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuI
 			break;
 	}
 	s_search_data = compute_search_data(radius, type, opennow);
+	if(old_search_data != s_search_data){
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed");
+		is_setting_changed = true;
+	}
+	else
+		is_setting_changed = false;
 
 	window_stack_pop(true);
 }
@@ -522,6 +531,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	// Update last query time if we have success query
 	if(!strncmp(query_result, "Success", 7)){
 		last_query_time = time(NULL);
+		is_setting_changed = false; // we have acquired valid data since last config changed
 		successFlag = true;
 	}
 
@@ -566,6 +576,7 @@ static void init(){
 	num_of_list_items = 0;
 	last_query_time = 0;
 	is_querying = false;
+	is_setting_changed = false;
 	select_option = 0;
 	select_setting_option = 0;
 	if(persist_exists(PERSIST_KEY_SEARCH_DATA)){
