@@ -1,6 +1,6 @@
 #include <pebble.h>
 #define MAX_DATA_NUMBER 20 		// Max number of returned data
-#define MAIN_MENU_ROWS	2  		// Random and list
+#define MAIN_MENU_ROWS	3  		// Random, list and settings
 #define LIST_MENU_ROWS  MAX_DATA_NUMBER
 #define RESULT_AGE_TIME	300 		// How long the list is valid in seconds
 #define SELECT_OPTION_RANDOM	0
@@ -9,6 +9,7 @@
 #define LIST_MENU_TEXT_LENGTH	128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 18
+#define SETTING_MENU_TEXT_LENGTH	64
 #define WAIT_TEXT_LAYER_HEIGHT	32
 #define WAIT_ANIMATION_TIMER_DELTA	33
 #define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
@@ -22,10 +23,11 @@
 #define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
 #define KEY_SEARCH_OPTION		99	// key for appmessage
 
-static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
+static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List", "Settings"};
 static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restaurant name
 static char list_menu_sub_text[LIST_MENU_ROWS][LIST_MENU_SUB_TEXT_LENGTH];  // Direction and distance
 static char list_menu_header_text[32] = "Restaurants";
+static char setting_main_menu_text[3][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
 static char query_result[32];
 static char random_result[LIST_MENU_TEXT_LENGTH];
 static int num_of_list_items;  // number of the returned items
@@ -51,6 +53,11 @@ static TextLayer *s_result_text_layer;
 // The list menu for all candidate
 static Window *s_list_window;
 static MenuLayer *s_list_menu_layer;
+
+// The settings window
+static Window *s_setting_window;
+static MenuLayer *s_setting_main_menu_layer;
+static MenuLayer *s_setting_sub_menu_layer;
 
 // The waiting window
 static Window *s_wait_window;
@@ -116,25 +123,6 @@ static void main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 	menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
 }
 
-static uint16_t list_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
-	return num_of_list_items;
-}
-
-static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer, uint16_t section_index, void *callback_context){
-	return LIST_MENU_HEADER_HEIGHT;
-}
-
-static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char *text = list_menu_text[cell_index->row];
-	char *sub_text = list_menu_sub_text[cell_index->row];
-
-	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
-}
-
-static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	menu_cell_basic_header_draw(ctx, cell_layer, list_menu_header_text);
-}
-
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
 
@@ -168,11 +156,6 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 
 }
 
-static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-// Currently do nothing. Consider to provide detailed information in the future.
-	APP_LOG(APP_LOG_LEVEL_INFO, "%d item selected", cell_index->row);
-}
-
 static void main_window_load(Window *window) {
 	// Create Window's child Layers here
 	Layer *window_layer = window_get_root_layer(window);
@@ -194,23 +177,28 @@ static void main_window_unload(Window *window) {
 	menu_layer_destroy(s_main_menu_layer);
 }
 
-static void result_window_load(Window *window) {
-	Layer *window_layer = window_get_root_layer(window);
-	GRect bounds = layer_get_bounds(window_layer);
-	
-	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
-
-	s_result_text_layer = text_layer_create(bounds);
-	text_layer_set_font(s_result_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-	text_layer_set_text_alignment(s_result_text_layer, GTextAlignmentLeft);
-	text_layer_set_background_color(s_result_text_layer, GColorClear);
-	text_layer_set_text_color(s_result_text_layer, GColorBlack);
-	text_layer_set_text(s_result_text_layer, random_result);
-	layer_add_child(window_layer, text_layer_get_layer(s_result_text_layer));
+static uint16_t list_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
+	return num_of_list_items;
 }
 
-static void result_window_unload(Window *window) {
-	text_layer_destroy(s_result_text_layer);
+static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer, uint16_t section_index, void *callback_context){
+	return LIST_MENU_HEADER_HEIGHT;
+}
+
+static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
+	char *text = list_menu_text[cell_index->row];
+	char *sub_text = list_menu_sub_text[cell_index->row];
+
+	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
+}
+
+static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
+	menu_cell_basic_header_draw(ctx, cell_layer, list_menu_header_text);
+}
+
+static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+// Currently do nothing. Consider to provide detailed information in the future.
+	APP_LOG(APP_LOG_LEVEL_INFO, "%d item selected", cell_index->row);
 }
 
 static void list_window_load(Window *window) {
@@ -233,6 +221,31 @@ static void list_window_load(Window *window) {
 
 static void list_window_unload(Window *window) {
 	menu_layer_destroy(s_list_menu_layer);
+}
+
+static void result_window_load(Window *window) {
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+	
+	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
+
+	s_result_text_layer = text_layer_create(bounds);
+	text_layer_set_font(s_result_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+	text_layer_set_text_alignment(s_result_text_layer, GTextAlignmentLeft);
+	text_layer_set_background_color(s_result_text_layer, GColorClear);
+	text_layer_set_text_color(s_result_text_layer, GColorBlack);
+	text_layer_set_text(s_result_text_layer, random_result);
+	layer_add_child(window_layer, text_layer_get_layer(s_result_text_layer));
+}
+
+static void result_window_unload(Window *window) {
+	text_layer_destroy(s_result_text_layer);
+}
+
+static void setting_window_load(Window *window){
+}
+
+static void setting_window_unload(Window *window){
 }
 
 static void wait_animation_next_timer(void);
@@ -415,6 +428,13 @@ static void init(){
 	window_set_window_handlers(s_list_window, (WindowHandlers){
 		.load = list_window_load,
 		.unload = list_window_unload
+	});
+
+	// Create settings window
+	s_setting_window = window_create();
+	window_set_window_handlers(s_setting_window, (WindowHandlers){
+		.load = setting_window_load,
+		.unload = setting_window_unload
 	});
 
 	// Create wait window
