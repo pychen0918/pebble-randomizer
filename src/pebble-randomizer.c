@@ -16,6 +16,12 @@
 #define WAIT_ANIMATION_BAR_HEIGHT	6
 #define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
 
+#define PERSIST_KEY_SEARCH_DATA		40
+#define DEFAULT_SEARCH_RADIUS		1	// 1km
+#define DEFAULT_SEARCH_TYPE		0	// Restaurant
+#define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
+#define KEY_SEARCH_OPTION		99	// key for appmessage
+
 static char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!","List"};
 static char list_menu_text[LIST_MENU_ROWS][LIST_MENU_TEXT_LENGTH];  // Restaurant name
 static char list_menu_sub_text[LIST_MENU_ROWS][LIST_MENU_SUB_TEXT_LENGTH];  // Direction and distance
@@ -25,6 +31,14 @@ static char random_result[LIST_MENU_TEXT_LENGTH];
 static int num_of_list_items;  // number of the returned items
 static AppTimer *s_wait_animation_timer;
 static int s_wait_animation_counter = 0;
+
+static uint32_t s_search_data;  // it is radius << 16 | type << 8 | opennow
+//static char search_distance_query_text[][32] = {"500", "1000", "5000", "10000"};
+//static char search_distance_display_text[][32] = {"500 M", "1 KM", "5 KM", "10 KM"};
+//static char search_type_query_text[][32] = {"restaurant", "food"};
+//static char search_type_display_text[][32] = {"Restaurants", "Foods"};
+//static char search_opennow_query_text[][32] = {"", "opennow"};
+//static char search_opennow_display_text[][32] = {"No", "Yes"};  // search only opening store?
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -52,10 +66,23 @@ static bool is_querying;
 // The selected option while waiting
 static int select_option;
 
+static uint32_t compute_search_data(uint8_t radius, uint8_t type, uint8_t opennow){
+	return (radius << 16) | (type << 8) | opennow;
+}
+
+static void get_search_options(uint32_t search_data, uint8_t *radius, uint8_t *type, uint8_t *opennow){
+	*radius = search_data & 0xff0000;
+	*type = search_data & 0xff00;
+	*opennow = search_data & 0xff;
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "radius=%d type=%d opennow=%d", (int)*radius, (int)*type, (int)*opennow);
+}
+
 static void send_query(void){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
-	dict_write_uint8(iter, 0, 0);  // don't care about the content
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "search_data=%u", (unsigned int)s_search_data);
+	dict_write_uint32(iter, KEY_SEARCH_OPTION, s_search_data);
+	//dict_write_uint8(iter, 0, 0);
 	app_message_outbox_send();
 }
 
@@ -360,9 +387,14 @@ static void init(){
 	srand(time(NULL));
 
 	// Initialize variables
-	num_of_list_items = 0;
-	last_query_time = 0;
-	is_querying = false;
+	if(persist_exists(PERSIST_KEY_SEARCH_DATA)){
+		s_search_data = persist_read_int(PERSIST_KEY_SEARCH_DATA);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "search_data=%u", (unsigned int)s_search_data);
+	}
+	else{
+		s_search_data = compute_search_data(DEFAULT_SEARCH_RADIUS, DEFAULT_SEARCH_TYPE, DEFAULT_SEARCH_OPENNOW);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "default search_data=%u", (unsigned int)s_search_data);
+	}
 
 	// Create main window
 	s_main_window = window_create();
@@ -410,6 +442,9 @@ static void deinit(){
 	window_destroy(s_main_window);
 	window_destroy(s_result_window);
 	window_destroy(s_list_window);
+
+	// Update Persist data
+	persist_write_data(PERSIST_KEY_SEARCH_DATA, &s_search_data, sizeof(s_search_data));
 }
 
 int main(void) {

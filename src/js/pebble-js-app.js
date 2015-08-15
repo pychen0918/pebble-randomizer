@@ -42,8 +42,8 @@ function locationSuccess(pos){
 		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
 		"&radius=" + "1000" +
 		"&types=" + "restaurant" +
-		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s" +
-		"&opennow";
+		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
+//		"&opennow";
 
 	console.log("url: " + url);
 
@@ -129,7 +129,7 @@ Pebble.addEventListener("ready",
 
 Pebble.addEventListener("appmessage",
 	function(e) {
-		console.log("App Message received");
+		console.log("App Message received: e.payload[search_option] = " + e.payload['search_option']);
 		getLocation();
 	}
 );
