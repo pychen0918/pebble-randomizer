@@ -71,8 +71,8 @@ static uint32_t compute_search_data(uint8_t radius, uint8_t type, uint8_t openno
 }
 
 static void get_search_options(uint32_t search_data, uint8_t *radius, uint8_t *type, uint8_t *opennow){
-	*radius = search_data & 0xff0000;
-	*type = search_data & 0xff00;
+	*radius = (search_data & 0xff0000) >> 16;
+	*type = (search_data & 0xff00) >> 8;
 	*opennow = search_data & 0xff;
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "radius=%d type=%d opennow=%d", (int)*radius, (int)*type, (int)*opennow);
 }

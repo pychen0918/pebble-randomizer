@@ -13,7 +13,8 @@
     "location"
   ],
   "appKeys": {
-    "dummy": 0
+    "dummy": 0,
+    "search_option": 99
   },
   "resources": {
     "media": []

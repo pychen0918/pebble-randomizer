@@ -1,3 +1,8 @@
+var g_search_option;
+var g_radius_text = ["500","1000","5000","10000"];
+var g_type_text = ["restaurant","food"];
+var g_opennow_text = ["", "&opennow"];
+
 function xhrRequest(url, type, callback) {
 	var xhr = new XMLHttpRequest();
 	xhr.onload = function () {
@@ -38,12 +43,16 @@ function locationSuccess(pos){
 		" head=" + pos.coords.heading +
 		" speed=" + pos.coords.speed
 		);
+
+	var radius = g_radius_text[(g_search_option & 0xff0000) >> 16];
+	var type = g_type_text[(g_search_option & 0xff00) >> 8];
+	var opennow = g_opennow_text[(g_search_option & 0xff)];
 	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
 		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
-		"&radius=" + "1000" +
-		"&types=" + "restaurant" +
+		"&radius=" + radius + 
+		"&types=" + type +
+		opennow +
 		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
-//		"&opennow";
 
 	console.log("url: " + url);
 
@@ -130,6 +139,7 @@ Pebble.addEventListener("ready",
 Pebble.addEventListener("appmessage",
 	function(e) {
 		console.log("App Message received: e.payload[search_option] = " + e.payload['search_option']);
+		g_search_option = e.payload['search_option'];
 		getLocation();
 	}
 );
