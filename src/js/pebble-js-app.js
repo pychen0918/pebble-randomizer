@@ -1,7 +1,23 @@
-var g_search_option;
-var g_radius_text = ["500","1000","5000","10000"];
-var g_type_text = ["restaurant","food"];
+var g_query_type;  // 0: list, 1: detail
+
+var g_option_range;
+var g_option_type;
+var g_option_opennow;
+
+var g_range_text = ["500","1000","5000","10000"];
+var g_type_text = ["food", "restaurant", "cafe", "bar"];
 var g_opennow_text = ["", "&opennow"];
+
+var api_key = "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
+
+// Query status code that need to send back to pebble
+var status_code = {
+	success : 0,
+	no_result : 1, 
+	timeout : 2, 
+	api_error : 3
+};
+var list_first_key = 30;
 
 function xhrRequest(url, type, callback) {
 	var xhr = new XMLHttpRequest();
@@ -12,8 +28,8 @@ function xhrRequest(url, type, callback) {
 	xhr.send();
 };
 
-function getDistance(lat1, lon1, lat2, lon2) {
 // Calculate distance by using approximation
+function getDistance(lat1, lon1, lat2, lon2) {
 	var R = 6731009;  // earth radius in meters
 	var a = (lat1 - lat2)*(Math.PI / 180);
 	var b = Math.cos((lat1+lat2)*(Math.PI/180)/2) * (lon1 - lon2)*(Math.PI/180);
@@ -21,19 +37,19 @@ function getDistance(lat1, lon1, lat2, lon2) {
 	return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters
 }
 
-function getDirection(lat1, lon1, lat2, lon2) {
 // Calculate direction. 
 // (lat1, lon1) is current position, and (lat2, lon2) is target position
-	var directionName = ["N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"];
+function getDirection(lat1, lon1, lat2, lon2) {
 	var t = Math.atan2(lon2-lon1, lat2-lat1)*(180/Math.PI);
 	var index = Math.round(t / 45);
 	if(index < 0)
 		index = index+8;
 
-	return directionName[index];
+	return index;
 }
 
 function locationSuccess(pos){
+/*
 	console.log("Location success:" + 
 		" lat=" + pos.coords.latitude +
 		' lon=' + pos.coords.longitude +
@@ -43,55 +59,71 @@ function locationSuccess(pos){
 		" head=" + pos.coords.heading +
 		" speed=" + pos.coords.speed
 		);
-
-	var radius = g_radius_text[(g_search_option & 0xff0000) >> 16];
-	var type = g_type_text[(g_search_option & 0xff00) >> 8];
-	var opennow = g_opennow_text[(g_search_option & 0xff)];
-	var url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
-		"location=" + pos.coords.latitude + "," + pos.coords.longitude +
-		"&radius=" + radius + 
-		"&types=" + type +
-		opennow +
-		"&key=" + "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
-
+*/
+	var url;
+	if(g_query_type == 0){  // list
+		url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
+			"location=" + pos.coords.latitude + "," + pos.coords.longitude +
+			"&radius=" + g_range_text[g_option_range] + 
+			"&types=" + g_type_text[g_option_type] +
+			g_opennow_text[g_option_opennow] +
+			"&key=" + api_key;
+	} 
+	else if(g_query_type == 1){ // detail
+		url = "https://maps.googleapis.com/maps/api/place/details/json?" + 
+			"placeid=" + g_place_id +
+			"&key=" + api_key;
+	}
 	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
 		function(responseText) {
 			var json;
-			var i;
-			var key;
+			var i, key;
 			var dictionary = {};
-			var distance, lat, lon, direction;
+			var distance, lat, lon, direction, place_id;
+			var address, phone, rating;
 			
-			// Parse response with exception handle
-			// It is possible that google returned with error page
 			try{
 				json = JSON.parse(responseText);
-				// Parse and store the food info (name, distance, direction)
-				key = 1;
-				for(i in json.results){
-					lat = json.results[i].geometry.location.lat;
-					lon = json.results[i].geometry.location.lng;
-					distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
-					direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
-					console.log(" key: " + key + 
-						    " name: " + json.results[i].name + 
-						    " direction: " + direction + 
-						    " distance: " + distance);
-					dictionary[key] = json.results[i].name + "|" + direction + " " + distance;
-					key++;
+				// early error handling
+				if(json.status != 'OK' ){
+					dictionary['status'] = status_code['api_error'];
+					dictionary['error_message'] = json.status + ": " + json.error_message;
 				}
-				console.log("List complete");
-				if(key == 1)  // didn't get any result
-					dictionary[0] = "No result!";
-				else
-					dictionary[0] = "Success";
+				else if(g_query_type == 0){ // list
+					key = list_first_key;
+					for(i in json.results){
+						lat = json.results[i].geometry.location.lat;
+						lon = json.results[i].geometry.location.lng;
+						place_id = json.results[i].place_id;
+						distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
+						direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
+						console.log(" key: " + key + 
+							    " name: " + json.results[i].name + 
+							    " direction: " + direction + 
+							    " distance: " + distance +
+							    " place_id: " + place_id);
+						dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + placeid;
+						key++;
+					}
+					if(key == 1)  // didn't get any result
+						dictionary['status'] = status_code['no_result'];
+					else
+						dictionary['status'] = status_code['success'];
+				}
+				else if(g_query_type == 1){ // detail
+					phone = json.result.formatted_phone_number;
+					rating = Math.round(json.result.rating);
+					address = json.result.vicinity;
+					dictionary['status'] = status_code['success'];
+				}
 			} 
 			catch(e){
 				console.log("Error while parsing response: ");
 				console.log(responseText);
-				dictionary[0] = "Received Invalid Data";
+				dictionary['status'] = status_code['api_error'];
+				dictionary['error_message'] = e.message;
 			}
 
 			// Send to Pebble
@@ -109,8 +141,8 @@ function locationSuccess(pos){
 
 function locationError(err){
 	var dictionary = {};
-	console.log("Location error: code=" + err.code + " msg=" + err.message);
-	dictionary[0] = "Cannot get current location";
+	//console.log("Location error: code=" + err.code + " msg=" + err.message);
+	dictionary['status'] = status_code['timeout'];
 	Pebble.sendAppMessage(dictionary,
 		function(e) {
 			console.log("List sent to Pebble successfully!");
@@ -124,9 +156,13 @@ function locationError(err){
 
 function getLocation() {
 	navigator.geolocation.getCurrentPosition(
-	locationSuccess,
-	locationError,
-	{enableHighAccuracy: false, timeout: 20000, maximumAge: 120000}
+		locationSuccess,
+		locationError,
+		{
+			enableHighAccuracy: false, 
+			timeout: 20000, 
+			maximumAge: 60000
+		}
 	);
 }
 
@@ -138,8 +174,29 @@ Pebble.addEventListener("ready",
 
 Pebble.addEventListener("appmessage",
 	function(e) {
-		console.log("App Message received: e.payload[search_option] = " + e.payload['search_option']);
-		g_search_option = e.payload['search_option'];
-		getLocation();
+		g_query_type = e.payload['query_type'];
+		if(g_query_type == 0){ // list
+			g_option_range = e.payload['query_option_range'];
+			g_option_type = e.payload['query_option_type'];
+			g_option_opennow = e.payload['query_option_opennow'];
+			getLocation();
+		}
+		else if(g_query_type == 1){ // detail
+			g_place_id = e.payload['query_place_id'];
+			getLocation();
+		}
+		else{ // unknown query type
+			console.log("Unknown query type");
+			var error = {};
+			error['status'] = status_code['api_error'];
+			Pebble.sendAppMessage(error,
+				function(e) {
+					console.log("List sent to Pebble successfully!");
+				},
+				function(e) {
+					console.log("Error sending list info to Pebble!");
+				}
+			);
+		}	
 	}
 );

@@ -1,62 +1,91 @@
 #include <pebble.h>
-#define MAX_DATA_NUMBER 20 		// Max number of returned data
-#define MAIN_MENU_ROWS	3  		// Random, list and settings
-#define LIST_MENU_ROWS  MAX_DATA_NUMBER
-#define RESULT_AGE_TIME	300 		// How long the list is valid in seconds
-#define SELECT_OPTION_RANDOM	0
-#define SELECT_OPTION_LIST	1
-#define MAIN_MENU_TEXT_LENGTH	64
-#define LIST_MENU_TEXT_LENGTH	128
+
+#define SEARCH_RESULT_MAX_DATA_NUMBER	20	// Max number of returned data
+#define SEARCH_RESULT_AGE_TIMEOUT	60 	// How long the list is valid in seconds
+
+#define MAIN_MENU_ROWS			3	// Random, list and settings
+#define MAIN_MENU_OPTION_RANDOM		0
+#define MAIN_MENU_OPTION_LIST		1
+#define MAIN_MENU_OPTION_SETTING	2
+#define MAIN_MENU_TEXT_LENGTH		64
+
+#define LIST_MENU_ROWS  		SEARCH_RESULT_MAX_DATA_NUMBER
+#define LIST_MENU_TEXT_LENGTH		128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 	18
+
+#define SETTING_MENU_OPTION_RANGE	0
+#define SETTING_MENU_OPTION_TYPE	1
+#define SETTING_MENU_OPTION_OPENNOW	2
 #define SETTING_MENU_TEXT_LENGTH	64
 #define SETTING_MENU_SUB_TEXT_LENGTH	64
 #define SETTING_MENU_HEADER_HEIGHT	18
-#define WAIT_TEXT_LAYER_HEIGHT		32
+
 #define WAIT_ANIMATION_TIMER_DELTA	33
 #define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
 #define WAIT_ANIMATION_BAR_RIGHT_MARGIN	10
 #define WAIT_ANIMATION_BAR_HEIGHT	6
 #define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
+#define WAIT_TEXT_LAYER_HEIGHT		32
 
-#define PERSIST_KEY_SEARCH_DATA		40
-#define DEFAULT_SEARCH_RADIUS		1	// 1km
-#define DEFAULT_SEARCH_TYPE		0	// Restaurant
+#define PERSIST_KEY_USER_SETTING	40
+
+// XXX: If changed the following status code, the js file might need to be updated
+#define QUERY_STATUS_SUCCESS		0
+#define QUERY_STATUS_NO_RESULT		1
+#define QUERY_STATUS_GPS_TIMEOUT	2
+#define QUERY_STATUS_GOOGLE_API_ERROR	3
+#define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
+#define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
+
+#define DEFAULT_SEARCH_RANGE		1	// 1km
+#define DEFAULT_SEARCH_TYPE		1	// Restaurant
 #define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
-#define KEY_SEARCH_OPTION		99	// key for appmessage
+
+// Key for appmessage
+#define KEY_STATUS			0
+#define KEY_QUERY_TYPE			1	
+#define KEY_QUERY_PLACE_ID		2	// store place id
+#define KEY_QUERY_ERROR_MESSAGE		3
+#define KEY_QUERY_OPTION_RANGE		10
+#define KEY_QUERY_OPTION_TYPE		11
+#define KEY_QUERY_OPTION_OPENNOW	12
+#define KEY_DETAIL_ADDRESS		20	// detail information returned by 'detail' query
+#define KEY_DETAIL_PHONE		21
+#define KEY_DETAIL_RATING		22
+#define KEY_LIST_FIRST			30	// First restaurant information data (returned by 'list' query)
 
 // --------------------------------------------------------------------------------------
 // XXX: Data Structure Defination
 // --------------------------------------------------------------------------------------
 
 typedef struct __restaurant_information_t{
-	char *name;		// name of the restaurant
-	char *place_id;		// the Google place_id. Need for searching telphone number
-	char *address;		// the short address
-	char *tel;		// the telphone number
-	uint8_t rating;		// user rating of the store. Interger between 0 ~ 5
-	uint8_t direction;	// compass direction from current loation, e.g., N, NE, E, ...
-	uint16_t distance;	// distance between current location and the restraunt. Roundup to 10 meters.
+	char *name;				// name of the restaurant
+	char *place_id;				// the Google place_id. Need for searching telphone number
+	char *address;				// the short address
+	char *tel;				// the telphone number
+	uint8_t rating;				// user rating of the store. Interger between 0 ~ 5
+	uint8_t direction;			// compass direction from current loation, e.g., N, NE, E, ...
+	uint16_t distance;			// distance between current location and the restraunt. Roundup to 10 meters.
 } RestaurantInformation;
 
 typedef struct __search_result_t{
-	RestaurantInformation restaurant_info[MAX_DATA_NUMBER];	// The above restaurant information. Up to 20 restaurants.
-	time_t last_query_time;		// The epoch time of the last successful query. Use to check if the data is valid or not.
-	uint8_t num_of_restaurant;	// How many restaurants actually found
-	uint8_t query_status;		// Record currect status. Use to check if the data is valid or not.
-	uint8_t random_result;		// Record the index of random picked restaurant. Between 0 ~ (num_of_restaurant-1)
-	bool is_querying;		// Are we currently waiting for query result returns. Do not send another one.
+	RestaurantInformation restaurant_info[SEARCH_RESULT_MAX_DATA_NUMBER];	// The above restaurant information. Up to 20 restaurants.
+	time_t last_query_time;			// The epoch time of the last successful query. Use to check if the data is valid or not.
+	uint8_t num_of_restaurant;		// How many restaurants actually found
+	uint8_t query_status;			// Record latest query status. Use to check if the data is valid or not.
+	uint8_t random_result;			// Record the index of random picked restaurant. Between 0 ~ (num_of_restaurant-1)
+	bool is_querying;			// Are we currently waiting for query result returns. Do not send another one.
+	bool is_setting_changed;		// if user has made changes after last query
 } SearchResult;
 
 typedef struct __user_setting_t{
-	uint8_t range_index;	// Index of selected range (0: 500m, 1: 1km, 2: 5km, 3: 10km)
-	uint8_t keyword_index;	// Index of selected keyword (0: Restaurant, 1: Food)
-	uint8_t opennow_index;	// Index of selected opennow filter (0: Disable, 1: Enable)
-	bool is_setting_changed;// if user has made changes after last query
+	uint8_t range;				// Index of selected range (0: 500m, 1: 1km, 2: 5km, 3: 10km)
+	uint8_t keyword;			// Index of selected keyword (0: Food, 1: Restaurant, 2: Cafe, 3: Bar)
+	uint8_t opennow;			// Index of selected opennow filter (0: Disable, 1: Enable)
 } UserSetting;
 
 typedef struct __menu_status_t{
-	UserSetting user_setting;		// The above user configuations.
 	uint8_t main_menu_selected_option; 	// which function is selected by user (Random, List, Setting)
 	uint8_t setting_menu_selected_option; 	// which setting menu is selected by user (Range, Keyword, Open Now)
 } MenuState;
@@ -71,20 +100,16 @@ const char *setting_main_menu_header_text = "Options";
 const char setting_main_menu_text[][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
 
 const char search_distance_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
-const char search_type_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Restaurants", "Foods"};
+const char search_type_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Food", "Restaurant", "Cafe", "Bar"};
 const char search_opennow_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};
-
-// the following string are send in AppMessage for the phone to use in the query
-const char search_distance_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500", "1000", "5000", "10000"};
-const char search_type_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"restaurant", "food"};
-const char search_opennow_query_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"", "opennow"};
 
 // --------------------------------------------------------------------------------------
 // XXX: The global variables
 // --------------------------------------------------------------------------------------
 
 static SearchResult s_search_result;	// The main data structure to store the returned search results
-static MenuState s_menu_state;		// The main data structure to store the user's selection on the menu
+static UserSetting s_user_setting;	// The main data structure to store custom searching configuations.
+static MenuState s_menu_state;		// The main data structure to store user's selection on the menu
 
 static AppTimer *s_wait_animation_timer;// Timers for waiting animation
 static int s_wait_animation_counter = 0;
@@ -120,23 +145,24 @@ static bool validate_data(void){
 	return false;
 }
 
-static uint32_t compute_search_data(uint8_t radius, uint8_t type, uint8_t opennow){
-	return (radius << 16) | (type << 8) | opennow;
-}
-
-static void get_search_options(uint32_t search_data, uint8_t *radius, uint8_t *type, uint8_t *opennow){
-	*radius = (search_data & 0xff0000) >> 16;
-	*type = (search_data & 0xff00) >> 8;
-	*opennow = search_data & 0xff;
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "radius=%d type=%d opennow=%d", (int)*radius, (int)*type, (int)*opennow);
-}
-
-static void send_query(void){
+// Send out the 'list' query to retrieve 20 nearby restaurant info
+static void send_list_query(void){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "search_data=%u", (unsigned int)s_search_data);
-	dict_write_uint32(iter, KEY_SEARCH_OPTION, s_search_data);
-	//dict_write_uint8(iter, 0, 0);
+	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_LIST);
+	dict_write_uint8(iter, KEY_QUERY_OPTION_RANGE, s_user_setting.range);
+	dict_write_uint8(iter, KEY_QUERY_OPTION_TYPE, s_user_setting.type);
+	dict_write_uint8(iter, KEY_QUERY_OPTION_OPENNOW, s_user_setting.opennow);
+	app_message_outbox_send();
+}
+
+// Send out the 'detail' query to retrieve certain restaurant detailed info
+// Input is the index of the store in the list
+static void send_detail_query(uint8_t store_index){
+	DictionaryIterator *iter;
+	app_message_outbox_begin(&iter);
+	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_DETAIL);
+	dict_write_cstring(iter, KEY_QUERY_PLACE_ID, s_search_result.restaurant_info[store_index].place_id);
 	app_message_outbox_send();
 }
 
@@ -604,7 +630,6 @@ static void wait_window_push(void){
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
-	// Read first item
 	Tuple *t = dict_read_first(iterator);
 	Window *top_window;
 	int index;
@@ -612,7 +637,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	char *l, *r, buf[256];
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
-	is_querying = false;  // reset the flag
+	s_search_result.is_querying = false;  // reset the flag
 
 	// store the list
 	index = 0;
@@ -673,17 +698,17 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 	APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
-	is_querying = false;
+	s_search_result.is_querying = false;
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-	APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
-	is_querying = true;
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Outbox send success!");
+	s_search_result.is_querying = true;
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
 	APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
-	is_querying = false;  // reset the flag
+	s_search_result.is_querying = false;  // reset the flag
 }
 
 static void init(){
@@ -691,20 +716,23 @@ static void init(){
 	srand(time(NULL));
 
 	// Initialize variables
-	num_of_list_items = 0;
-	last_query_time = 0;
-	is_querying = false;
-	is_setting_changed = false;
-	select_option = 0;
-	select_setting_option = 0;
-	if(persist_exists(PERSIST_KEY_SEARCH_DATA)){
-		s_search_data = persist_read_int(PERSIST_KEY_SEARCH_DATA);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "search_data=%u", (unsigned int)s_search_data);
-	}
+	memset(s_search_result.restaurant_info, 0, sizeof(s_search_result.restaurant_info));
+	s_search_result.is_querying = false;
+	s_search_result.last_query_time = 0;
+	s_search_result.num_of_restaurant = 0;
+	s_search_result.query_status = QUERY_STATUS_NO_RESULT;
+	s_search_result.random_result = 0;
+	s_search_result.is_querying = false;
+	s_search_result.is_setting_changed = false;
+	if(persist_exists(PERSIST_KEY_USER_SETTING))
+		persist_read_data(PERSIST_KEY_USER_SETTING, &s_user_setting);
 	else{
-		s_search_data = compute_search_data(DEFAULT_SEARCH_RADIUS, DEFAULT_SEARCH_TYPE, DEFAULT_SEARCH_OPENNOW);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "default search_data=%u", (unsigned int)s_search_data);
+		s_user_setting.range_index = DEFAULT_SEARCH_RANGE;
+		s_user_setting.type_index = DEFAULT_SEARCH_TYPE;
+		s_user_setting.opennow_index = DEFAULT_SEARCH_OPENNOW;
 	}
+	s_menu_state.main_menu_selected_option = MAIN_MENU_OPTION_RANDOM;
+	s_menu_state.setting_menu_selected_option = SETTING_MENU_OPTION_RANGE;
 
 	// Create main window
 	s_main_window = window_create();
@@ -729,7 +757,7 @@ static void deinit(){
 	window_destroy(s_main_window);
 
 	// Update Persist data
-	persist_write_data(PERSIST_KEY_SEARCH_DATA, &s_search_data, sizeof(s_search_data));
+	persist_write_data(PERSIST_KEY_USER_SETTING, &s_user_setting, sizeof(s_user_setting));
 }
 
 int main(void) {
