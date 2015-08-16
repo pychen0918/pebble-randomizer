@@ -157,7 +157,7 @@ static void generate_random_result_window(void){
 			strncpy(random_result, "No result!", sizeof(random_result));
 	}
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Random result: %d %s", index, random_result);
-	window_stack_push(s_result_window, true);
+	result_window_push();
 }
 
 static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
@@ -190,20 +190,20 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 			else{
 				if(is_querying == false)
 					send_query();
-				window_stack_push(s_wait_window, true);
+				wait_window_push();
 			}
 			break;
 		case 1:  // List
 			if(valid_result)
-				window_stack_push(s_list_window, true);
+				list_window_push();
 			else{
 				if(is_querying == false)
 					send_query();
-				window_stack_push(s_wait_window, true);
+				wait_window_push();
 			}
 			break;
 		case 2:  // Setting
-			window_stack_push(s_setting_window, true);
+			setting_window_push();
 			break;
 		default:
 			APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown selection");
@@ -291,6 +291,7 @@ static void list_window_push(void){
 			.unload = list_window_unload
 		});
 	}
+	window_stack_push(s_list_window, true);
 }
 
 static void result_window_load(Window *window) {
@@ -324,6 +325,7 @@ static void result_window_push(void){
 			.unload = result_window_unload
 		});
 	}
+	window_stack_push(s_result_window, true);
 }
 
 static uint16_t setting_main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
@@ -364,7 +366,7 @@ static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *ce
 static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	select_setting_option = cell_index->row;
 
-	window_stack_push(s_setting_sub_window, true);
+	setting_sub_window_push();
 }
 
 static void setting_window_load(Window *window){
@@ -401,6 +403,7 @@ static void setting_window_push(void){
 			.unload = setting_window_unload
 		});
 	}
+	window_stack_push(s_setting_window, true);
 }
 
 static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
@@ -515,6 +518,7 @@ static void setting_sub_window_push(void){
 			.unload = setting_sub_window_unload
 		});
 	}
+	window_stack_push(s_setting_sub_window, true);
 }
 
 static void wait_animation_next_timer(void);
@@ -596,6 +600,7 @@ static void wait_window_push(void){
 			.disappear = wait_window_disappear
 		});
 	}
+	window_stack_push(s_wait_window, true);
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
@@ -660,7 +665,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 			if(!successFlag)
 				generate_random_result_window();
 			else
-				window_stack_push(s_list_window, true);
+				list_window_push();
 		}
 		window_stack_remove(s_wait_window, false);
 	}
@@ -708,11 +713,6 @@ static void init(){
 		.unload = main_window_unload
 	});
 
-
-
-
-
-
 	// Register AppMessage callbacks
 	app_message_register_inbox_received(inbox_received_callback);
 	app_message_register_inbox_dropped(inbox_dropped_callback);
@@ -727,10 +727,6 @@ static void init(){
 static void deinit(){
 	// Destoy main window
 	window_destroy(s_main_window);
-	window_destroy(s_result_window);
-	window_destroy(s_list_window);
-	window_destroy(s_setting_window);
-	window_destroy(s_wait_window);
 
 	// Update Persist data
 	persist_write_data(PERSIST_KEY_SEARCH_DATA, &s_search_data, sizeof(s_search_data));
