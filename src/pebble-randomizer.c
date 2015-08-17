@@ -9,6 +9,12 @@
 #define MAIN_MENU_OPTION_SETTING	2
 #define MAIN_MENU_TEXT_LENGTH		64
 
+// What kind of operation user is currently performing
+#define USER_OPERATION_RANDOM		0
+#define USER_OPERATION_LIST		1
+#define USER_OPERATION_SETTING		2
+#define USER_OPERATION_DETAIL		3
+
 #define LIST_MENU_ROWS  		SEARCH_RESULT_MAX_DATA_NUMBER
 #define LIST_MENU_TEXT_LENGTH		128
 #define LIST_MENU_SUB_TEXT_LENGTH	16
@@ -63,7 +69,7 @@ typedef struct __restaurant_information_t{
 	char *name;				// name of the restaurant
 	char *place_id;				// the Google place_id. Need for searching telphone number
 	char *address;				// the short address
-	char *tel;				// the telphone number
+	char *phone;				// the telphone number
 	uint8_t rating;				// user rating of the store. Interger between 0 ~ 5
 	uint8_t direction;			// compass direction from current loation, e.g., N, NE, E, ...
 	uint16_t distance;			// distance between current location and the restraunt. Roundup to 10 meters.
@@ -75,6 +81,7 @@ typedef struct __search_result_t{
 	uint8_t num_of_restaurant;		// How many restaurants actually found
 	uint8_t query_status;			// Record latest query status. Use to check if the data is valid or not.
 	uint8_t random_result;			// Record the index of random picked restaurant. Between 0 ~ (num_of_restaurant-1)
+	char *api_error_message;			// Store Google API's return error message. Might be empty.
 	bool is_querying;			// Are we currently waiting for query result returns. Do not send another one.
 	bool is_setting_changed;		// if user has made changes after last query
 } SearchResult;
@@ -86,7 +93,7 @@ typedef struct __user_setting_t{
 } UserSetting;
 
 typedef struct __menu_status_t{
-	uint8_t main_menu_selected_option; 	// which function is selected by user (Random, List, Setting)
+	uint8_t user_operation;		 	// which function is currently performed by user (Random, List, Setting, Detail)
 	uint8_t setting_menu_selected_option; 	// which setting menu is selected by user (Range, Keyword, Open Now)
 } MenuState;
 
@@ -98,10 +105,21 @@ const char main_menu_text[][MAIN_MENU_TEXT_LENGTH] = {"Random!", "List", "Settin
 const char *list_menu_header_text = "Restaurants";
 const char *setting_main_menu_header_text = "Options";
 const char setting_main_menu_text[][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
+const char *wait_layer_header_text = "Searching...";
+
+// XXX: must match QUERY_STATUS_xxx index
+const char query_status_error_message[][256] = {"", "No Result", "GPS Timeout", "API Error"};
+const char query_status_error_sub_message[][256] = {"", "Please try other search options", "Please try again later", ""};
+
+const char unknown_error_message[256] = "Unknown error";
+const char unknown_error_sub_message[256] = "Please bring the following message to the author:";
 
 const char search_distance_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
 const char search_type_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Food", "Restaurant", "Cafe", "Bar"};
 const char search_opennow_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};
+
+const char direction_name[][16] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
+const char distance_unit[16] = "meters";
 
 // --------------------------------------------------------------------------------------
 // XXX: The global variables
@@ -120,7 +138,8 @@ static MenuLayer *s_main_menu_layer;
 
 // The random pick result
 static Window *s_result_window;
-static TextLayer *s_result_text_layer;
+static TextLayer *s_result_title_text_layer;
+static TextLayer *s_result_sub_text_layer;
 
 // The list menu for all candidate
 static Window *s_list_window;
@@ -166,24 +185,59 @@ static void send_detail_query(uint8_t store_index){
 	app_message_outbox_send();
 }
 
-// A wrapped subroutine to determine the query status
-// and generate result from list, or error message if query failed
-static void generate_random_result_window(void){
-	int index = 0;
+// allocate a space and copy string to that space. Return pointer to the space.
+static void *alloc_and_copy_string(char* string){
+	char *ptr;
+	int size = strlen(string)+1;
+	ptr = (char *)malloc(size);
+	strncpy(ptr, string, size-1);
+	return ptr;
+}
 
-	// Determine if we have valid query result
-	if(!strncmp(query_result, "Success", 7)){
-		index = rand()%num_of_list_items;
-		strncpy(random_result, list_menu_text[index], sizeof(random_result));
+// search for certain store with place_id
+static int find_index_from_place_id(char *place_id){
+	int index = -1;
+	int i, num_of_rest;
+	RestaurantInformation *ptr;
+	
+	ptr = s_search_result.restaurant_info;
+	num_of_rest = s_search_result.num_of_restaurant;
+	for( i = 0; i < num_of_rest; i++){
+		if(((ptr+i)->place_id != NULL) && !strcmp(place_id, (ptr+i)->place_id)){
+			index = i;
+			break;
+		}
 	}
-	else{
-		if(strlen(query_result)>0)
-			strncpy(random_result, query_result, sizeof(random_result));
-		else
-			strncpy(random_result, "No result!", sizeof(random_result));
+	return index;
+}
+
+// Free the dynamically allocated space in s_search_result
+static void free_search_result(void){
+	int i;
+	RestaurantInformation *ptr = s_search_result.restaurant_info;
+
+	for(i=0;i<MAX_DATA_NUMBER;i++){
+		if((ptr+i)->name != NULL){
+			free((ptr+i)->name);
+			(ptr+i)->name = NULL;
+		}
+		if((ptr+i)->place_id != NULL){
+			free((ptr+i)->place_id);
+			(ptr+i)->place_id = NULL;
+		}
+		if((ptr+i)->address != NULL){
+			free((ptr+i)->address);
+			(ptr+i)->address = NULL;
+		}
+		if((ptr+i)->phone != NULL){
+			free((ptr+i)->phone);
+			(ptr+i)->phone = NULL;
+		}
 	}
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Random result: %d %s", index, random_result);
-	result_window_push();
+	if(s_search_result.api_error_message != NULL){
+		free(s_search_result.api_error_message);
+		s_search_result.api_error_message = NULL;
+	}
 }
 
 static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
@@ -323,20 +377,61 @@ static void list_window_push(void){
 static void result_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
+	static char title_text[256], sub_text[256];  // static: keep them live longer for text_layer use
+	RestaurantInformation *ptr;
+	uint8_t status;
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
 
-	s_result_text_layer = text_layer_create(bounds);
-	text_layer_set_font(s_result_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-	text_layer_set_text_alignment(s_result_text_layer, GTextAlignmentLeft);
-	text_layer_set_background_color(s_result_text_layer, GColorClear);
-	text_layer_set_text_color(s_result_text_layer, GColorBlack);
-	text_layer_set_text(s_result_text_layer, random_result);
-	layer_add_child(window_layer, text_layer_get_layer(s_result_text_layer));
+	status = s_search_result.query_status;
+	switch(status){
+		case QUERY_STATUS_SUCCESS:
+			// Randomly pick up the restaurant
+			s_search_result.random_result = rand()%s_search_result.num_of_restaurant;
+			// Collect required fields
+			ptr = s_search_result.restaurant_info[s_search_result.random_result];
+			strncpy(title_text, ptr->name, sizeof(title_text));
+			snprintf(sub_text, sizeof(sub_text), "%s %u %s", direction_name[ptr->direction], (unsigned int)(ptr->distance), distance_unit);
+			break;
+		case QUERY_STATUS_NO_RESULT:
+		case QUERY_STATUS_GPS_TIMEOUT:
+			// Set corresponding error messages to title and subtitle
+			strncpy(title_text, query_status_error_message[status], sizeof(title_text));
+			strncpy(sub_text, query_status_sub_error_message[status], sizeof(sub_text));
+			break;
+		case QUERY_STATUS_GOOGLE_API_ERROR:
+			// Collect error message from returned information
+			strncpy(title_text, query_status_error_message[status], sizeof(title_text));
+			strncpy(sub_text, ptr->api_error_message, sizeof(sub_text));
+			break;
+		default:
+			// Other query status = unknown error
+			strncpy(title_text, unknown_error_message, sizeof(title_text));
+			snprintf(sub_text, sizeof(sub_text), "%s %s%d", unknown_error_sub_message, "Incorrect query status:",status);
+			break;
+	}
+
+	// title part
+	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, (bounds.size.h/2)));
+	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+	text_layer_set_text_alignment(s_result_title_text_layer, GTextAlignmentLeft);
+	text_layer_set_background_color(s_result_title_text_layer, GColorClear);
+	text_layer_set_text_color(s_result_title_text_layer, GColorBlack);
+	text_layer_set_text(s_result_title_text_layer, title_text);
+	layer_add_child(window_layer, text_layer_get_layer(s_result_title_text_layer));
+	// sub title part
+	s_result_sub_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y+(bounds.size.h/2), bounds.size.w, (bounds.size.h/2)));
+	text_layer_set_font(s_result_sub_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
+	text_layer_set_text_alignment(s_result_sub_text_layer, GTextAlignmentLeft);
+	text_layer_set_background_color(s_result_sub_text_layer, GColorClear);
+	text_layer_set_text_color(s_result_sub_text_layer, GColorBlack);
+	text_layer_set_text(s_result_sub_text_layer, sub_text);
+	layer_add_child(window_layer, text_layer_get_layer(s_result_sub_text_layer));
 }
 
 static void result_window_unload(Window *window) {
-	text_layer_destroy(s_result_text_layer);
+	text_layer_destroy(s_result_title_text_layer);
+	text_layer_destroy(s_result_sub_text_layer);
 
 	window_destroy(window);
 	s_result_window = NULL;
@@ -588,7 +683,7 @@ static void wait_window_load(Window *window) {
 	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
 	text_layer_set_background_color(s_wait_text_layer, GColorClear);
 	text_layer_set_text_color(s_wait_text_layer, GColorBlack);
-	text_layer_set_text(s_wait_text_layer, "Waiting");
+	text_layer_set_text(s_wait_text_layer, wait_layer_header_text);
 	layer_set_update_proc(s_wait_layer, wait_layer_update_proc);
 
 	layer_add_child(window_layer, text_layer_get_layer(s_wait_text_layer));
@@ -629,68 +724,135 @@ static void wait_window_push(void){
 	window_stack_push(s_wait_window, true);
 }
 
-static void inbox_received_callback(DictionaryIterator *iterator, void *context){
+// Parse the returned list dictionary data and store to s_search_result
+static void parse_list_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
-	Window *top_window;
 	int index;
-	bool successFlag = false;
-	char *l, *r, buf[256];
+	RestaurantInformation *ptr;
+	char buf[2][256];
+	char errmsg[256];
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
-	s_search_result.is_querying = false;  // reset the flag
-
-	// store the list
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
+	
 	index = 0;
 	while(t != NULL) {
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "key: %d Data: %s", (int)t->key, t->value->cstring);
 		switch(t->key){
-			case 0:
-				strncpy(query_result, t->value->cstring, sizeof(query_result));
+			case KEY_STATUS:
+				s_search_result.query_status = t->value->uint8;
+				break;
+			case KEY_QUERY_ERROR_MESSAGE:
+				strncpy(errmsg, t->value->cstring, sizeof(errmsg));
 				break;
 			default:
-				if((t->key >= 1) && (t->key < (MAX_DATA_NUMBER+1))){
-					// value string format: Restaurant name|Direction Distance
-					strncpy(buf, t->value->cstring, sizeof(buf));
-					l = r = buf;
-					while(*r!='|')
-						r++;
-					*r = '\0';
-					r++;
+				//  Check if the key fall in the data range
+				if((t->key >= KEY_LIST_FIRST) && (t->key < (KEY_LIST_FIRST + MAX_DATA_NUMBER))){
+					ptr = s_search_result.restaurant_info[index];
+					// value string format: Restaurant name|Direction|Distance|placeid
+					sscanf(t->value->cstring, "%s|%u|%u|%s", buf[0], ptr->direction, ptr->distance, buf[1]);
+					ptr->name = alloc_and_copy_string(buf[0]);
+					ptr->place_id = alloc_and_copy_string(buf[1]);
 
-					strncpy(list_menu_text[index], l, sizeof(list_menu_text[index]));
-					strncpy(list_menu_sub_text[index], r, sizeof(list_menu_sub_text[index]));
-					strncat(list_menu_sub_text[index], " meters", 7);
-					APP_LOG(APP_LOG_LEVEL_DEBUG, "index:%d menu_text:%s menu_sub_text:%s", index, list_menu_text[index], list_menu_sub_text[index]);
+					APP_LOG(APP_LOG_LEVEL_DEBUG, "index:%d key:%d name:%s direction:%d distance:%d place_id:%s", 
+						index, t->key, ptr->name, ptr->direction, ptr->distance, ptr->place_id);
 					index++;
 				}
 				else
-					APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);	
+					APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);
 				break;
 		}
 		t = dict_read_next(iterator);
 	}
-	num_of_list_items = index;
-	
-	// Update last query time if we have success query
-	if(!strncmp(query_result, "Success", 7)){
-		last_query_time = time(NULL);
-		is_setting_changed = false; // we have acquired valid data since last config changed
-		successFlag = true;
+	s_search_result.num_of_restaurant = index;
+
+	// Update some information if query success
+	if(s_search_result.query_status == QUERY_STATUS_SUCCESS){
+		s_search_result.last_query_time = time(NULL);
+		s_search_result.is_setting_changed = false;
+	}
+	else if(s_search_result.query_status == QUERY_STATUS_GOOGLE_API_ERROR){
+		s_search_result.api_error_message = alloc_and_copy_string(errmsg);
+	}
+}
+
+// Parse the returned list dictionary data and store to s_search_result
+static void parse_detail_message_handler(DictionaryIterator *iterator){
+	Tuple *t = dict_read_first(iterator);
+	uint8_t detail_query_status, rating;
+	char buf[2][256];
+	char errmsg[256];
+	int index;
+
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
+
+	switch(t->key){
+		case KEY_STATUS:
+			detail_query_status = t->value->uint8;
+			break;
+		case KEY_QUERY_ERROR_MESSAGE:
+			strncpy(errmsg, t->value->cstring, sizeof(errmsg));
+			break;
+		case KEY_QUERY_PLACE_ID:
+			// user might send multiple detail queries in once. Use the returned place_id as the key
+			index = find_index_from_place_id(t->value->cstring);
+			break;
+		case KEY_DETAIL_ADDRESS:
+			strncpy(buf[0], t->value->cstring, sizeof(buf[0]));
+			break;
+		case KEY_DETAIL_PHONE:
+			strncpy(buf[1], t->value->cstring, sizeof(buf[1]));
+			break;
+		case KEY_DETAIL_RATING:
+			rating = t->value->uint8;
+			break;
+		default:
+			APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);
+			break;
+	}
+
+	// Store the information if everything is OK
+	if((detail_query_status==QUERY_STATUS_SUCCESS) && (index >= 0)){
+		s_search_result.restaurant_info[index].address = alloc_and_copy_string(buf[0]);
+		s_search_result.restaurant_info[index].phone = alloc_and_copy_string(buf[1]);
+		s_search_result.restaurant_info[index].rating = rating;
+	}
+	else if(s_search_result.query_status == QUERY_STATUS_GOOGLE_API_ERROR){
+		s_search_result.api_error_message = alloc_and_copy_string(errmsg);
+	}
+}
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context){
+	Tuple *t = dict_read_first(iterator);
+	Window *top_window;
+
+	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
+	s_search_result.is_querying = false;  // reset the flag
+
+	while(t!=NULL){
+		if(t->key == KEY_QUERY_TYPE){
+			if(t->value->uint8 == QUERY_TYPE_LIST)
+				parse_list_message_handler(iterator);
+			else if(t->value->uint8 == QUERY_TYPE_DETAIL)
+				parse_detail_message_handler(iterator);
+			else
+				APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
+			break;
+		}
+		t = dict_read_next(iterator);
 	}
 
 	// Check current window
 	// If we are waiting, display the list or result window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		if(select_option == SELECT_OPTION_RANDOM){
-			generate_random_result_window();
+		if(s_menu_state->user_operation == USER_OPERATION_RANDOM){
+			result_window_push();
 		}
-		else if(select_option == SELECT_OPTION_LIST){
+		else if(s_menu_state->user_operation == USER_OPERATION_LIST){
 			// if we have failed query, still display result window with error message
-			if(!successFlag)
-				generate_random_result_window();
-			else
+			if(s_search_result->query_status == QUERY_STATUS_SUCCESS)
 				list_window_push();
+			else
+				result_window_push();
 		}
 		window_stack_remove(s_wait_window, false);
 	}
@@ -755,6 +917,9 @@ static void init(){
 static void deinit(){
 	// Destoy main window
 	window_destroy(s_main_window);
+
+	// Free allocated space
+	free_search_result();
 
 	// Update Persist data
 	persist_write_data(PERSIST_KEY_USER_SETTING, &s_user_setting, sizeof(s_user_setting));
