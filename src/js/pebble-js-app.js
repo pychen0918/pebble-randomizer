@@ -1,4 +1,5 @@
 var g_query_type;  // 0: list, 1: detail
+var g_query_uid;
 
 var g_option_range;
 var g_option_type;
@@ -92,6 +93,7 @@ function locationSuccess(pos){
 					dictionary['error_message'] = json.status + ": " + json.error_message;
 				}
 				else if(g_query_type == 0){ // list
+					dictionary['query_type'] = 0;
 					key = list_first_key;
 					for(i in json.results){
 						lat = json.results[i].geometry.location.lat;
@@ -113,17 +115,21 @@ function locationSuccess(pos){
 						dictionary['status'] = status_code['success'];
 				}
 				else if(g_query_type == 1){ // detail
+					dictionary['query_type'] = 1;
 					dictionary['detail_phone'] = json.result.formatted_phone_number;
 					dictionary['query_place_id'] = json.result.place_id;
 					dictionary['detail_rating'] = Math.round(json.result.rating);
 					dictionary['detail_address'] = json.result.vicinity;
 					dictionary['status'] = status_code['success'];
 				}
+				// always set uid
+				dictionary['query_uid'] = g_query_uid;
 			} 
 			catch(e){
 				console.log("Error while parsing response: ");
 				console.log(responseText);
 				dictionary['status'] = status_code['api_error'];
+				dictionary['query_uid'] = g_query_uid;
 				dictionary['error_message'] = e.message;
 			}
 
@@ -144,6 +150,7 @@ function locationError(err){
 	var dictionary = {};
 	//console.log("Location error: code=" + err.code + " msg=" + err.message);
 	dictionary['status'] = status_code['timeout'];
+	dictionary['query_uid'] = g_query_uid;
 	Pebble.sendAppMessage(dictionary,
 		function(e) {
 			console.log("List sent to Pebble successfully!");
@@ -176,6 +183,7 @@ Pebble.addEventListener("ready",
 Pebble.addEventListener("appmessage",
 	function(e) {
 		g_query_type = e.payload['query_type'];
+		g_query_uid = e.payload['query_uid'];
 		if(g_query_type == 0){ // list
 			g_option_range = e.payload['query_option_range'];
 			g_option_type = e.payload['query_option_type'];

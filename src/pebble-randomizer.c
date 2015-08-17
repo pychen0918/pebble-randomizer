@@ -20,6 +20,7 @@
 #define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 	18
 
+#define SETTING_MENU_ROWS		3	// Range, Type, Open Now
 #define SETTING_MENU_OPTION_RANGE	0
 #define SETTING_MENU_OPTION_TYPE	1
 #define SETTING_MENU_OPTION_OPENNOW	2
@@ -44,6 +45,9 @@
 #define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
 #define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
 
+#define DATA_VALID			0
+#define DATA_INVALID			1
+
 #define DEFAULT_SEARCH_RANGE		1	// 1km
 #define DEFAULT_SEARCH_TYPE		1	// Restaurant
 #define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
@@ -53,6 +57,7 @@
 #define KEY_QUERY_TYPE			1	
 #define KEY_QUERY_PLACE_ID		2	// store place id
 #define KEY_QUERY_ERROR_MESSAGE		3
+#define KEY_QUERY_UID			4	// unique id for each sent/received messages pair
 #define KEY_QUERY_OPTION_RANGE		10
 #define KEY_QUERY_OPTION_TYPE		11
 #define KEY_QUERY_OPTION_OPENNOW	12
@@ -70,25 +75,26 @@ typedef struct __restaurant_information_t{
 	char *place_id;				// the Google place_id. Need for searching telphone number
 	char *address;				// the short address
 	char *phone;				// the telphone number
+	uint16_t distance;			// distance between current location and the restraunt. Roundup to 10 meters.
 	uint8_t rating;				// user rating of the store. Interger between 0 ~ 5
 	uint8_t direction;			// compass direction from current loation, e.g., N, NE, E, ...
-	uint16_t distance;			// distance between current location and the restraunt. Roundup to 10 meters.
 } RestaurantInformation;
 
 typedef struct __search_result_t{
 	RestaurantInformation restaurant_info[SEARCH_RESULT_MAX_DATA_NUMBER];	// The above restaurant information. Up to 20 restaurants.
 	time_t last_query_time;			// The epoch time of the last successful query. Use to check if the data is valid or not.
 	uint8_t num_of_restaurant;		// How many restaurants actually found
-	uint8_t query_status;			// Record latest query status. Use to check if the data is valid or not.
+	uint8_t query_status;			// Record most recent query status. It is for list query only, not detail.
 	uint8_t random_result;			// Record the index of random picked restaurant. Between 0 ~ (num_of_restaurant-1)
-	char *api_error_message;			// Store Google API's return error message. Might be empty.
-	bool is_querying;			// Are we currently waiting for query result returns. Do not send another one.
+	uint8_t uid_next;			// The uid id for next message. Each send message must have unique id
+	char *api_error_message;		// Store Google API's return error message. Might be empty.
+	bool is_querying;			// If we are currently waiting for query result return, do not send another one.
 	bool is_setting_changed;		// if user has made changes after last query
 } SearchResult;
 
 typedef struct __user_setting_t{
 	uint8_t range;				// Index of selected range (0: 500m, 1: 1km, 2: 5km, 3: 10km)
-	uint8_t keyword;			// Index of selected keyword (0: Food, 1: Restaurant, 2: Cafe, 3: Bar)
+	uint8_t type;				// Index of selected type (0: Food, 1: Restaurant, 2: Cafe, 3: Bar)
 	uint8_t opennow;			// Index of selected opennow filter (0: Disable, 1: Enable)
 } UserSetting;
 
@@ -101,10 +107,9 @@ typedef struct __menu_status_t{
 // XXX: The constant strings
 // --------------------------------------------------------------------------------------
 
-const char main_menu_text[][MAIN_MENU_TEXT_LENGTH] = {"Random!", "List", "Settings"};
+const char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!", "List", "Settings"};
 const char *list_menu_header_text = "Restaurants";
 const char *setting_main_menu_header_text = "Options";
-const char setting_main_menu_text[][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
 const char *wait_layer_header_text = "Searching...";
 
 // XXX: must match QUERY_STATUS_xxx index
@@ -114,9 +119,10 @@ const char query_status_error_sub_message[][256] = {"", "Please try other search
 const char unknown_error_message[256] = "Unknown error";
 const char unknown_error_sub_message[256] = "Please bring the following message to the author:";
 
-const char search_distance_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
-const char search_type_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Food", "Restaurant", "Cafe", "Bar"};
-const char search_opennow_display_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};
+const char setting_main_menu_text[][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
+const char setting_range_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
+const char setting_type_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Food", "Restaurant", "Cafe", "Bar"};
+const char setting_opennow_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};
 
 const char direction_name[][16] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
 const char distance_unit[16] = "meters";
@@ -156,11 +162,19 @@ static Window *s_wait_window;
 static TextLayer *s_wait_text_layer;
 static Layer *s_wait_layer;
 
-// TODO:
+// --------------------------------------------------------------------------------------
+// XXX: Common functions
+// --------------------------------------------------------------------------------------
+
 // Check if current stored restaurant data is valid.
-// If not, return false so we can try to send another query.
-// Conditions are: query_status, num_of_restaurant, last_query_time, is_settings_changed
 static bool validate_data(void){
+	time_t now = time(NULL);
+	if(s_search_result.last_query_time > 0 && 					// must have query before
+	   ((now - s_search_result.last_query_time) < SEARCH_RESULT_AGE_TIMEOUT) &&	// didn't timeout 
+	   !(s_search_result.is_setting_changed))					// user haven't change settings
+	{
+		return true;
+	}
 	return false;
 }
 
@@ -169,6 +183,7 @@ static void send_list_query(void){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_LIST);
+	dict_write_uint8(iter, KEY_QUERY_UID, s_search_result.uid_next++);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_RANGE, s_user_setting.range);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_TYPE, s_user_setting.type);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_OPENNOW, s_user_setting.opennow);
@@ -181,6 +196,7 @@ static void send_detail_query(uint8_t store_index){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_DETAIL);
+	dict_write_uint8(iter, KEY_QUERY_UID, s_search_result.uid_next++);
 	dict_write_cstring(iter, KEY_QUERY_PLACE_ID, s_search_result.restaurant_info[store_index].place_id);
 	app_message_outbox_send();
 }
@@ -253,27 +269,28 @@ static void main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	time_t now;
 	bool valid_result = false;
+	bool is_querying = s_search_result.is_querying;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
 
-	select_option = cell_index->row;
-	// Do we have the valid result?
-	now = time(NULL);
-	if(last_query_time > 0 && ((now - last_query_time) < RESULT_AGE_TIME) && !is_setting_changed){
-		valid_result = true;
-	}
+	valid_result = validate_data();
+	s_menu_state.main_menu_selected_option = cell_index->row;
+
+	// free the space if the data are invalid
+	if(valid_result == false)
+		free_search_result();
 
 	switch(cell_index->row){
-		case 0:  // Random
+		case USER_OPERATION_RANDOM:
 			if(valid_result)
-				generate_random_result_window();
+				result_window_push();
 			else{
 				if(is_querying == false)
 					send_query();
 				wait_window_push();
 			}
 			break;
-		case 1:  // List
+		case USER_OPERATION_LIST:
 			if(valid_result)
 				list_window_push();
 			else{
@@ -282,11 +299,11 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 				wait_window_push();
 			}
 			break;
-		case 2:  // Setting
+		case USER_OPERATION_SETTING:
 			setting_window_push();
 			break;
 		default:
-			APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown selection");
+			APP_LOG(APP_LOG_LEVEL_ERROR, "Main menu invalid selection: %d", (int)(cell_index->row));
 			break;
 	}
 		
@@ -314,7 +331,7 @@ static void main_window_unload(Window *window) {
 }
 
 static uint16_t list_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
-	return num_of_list_items;
+	return s_search_result.num_of_restaurant;
 }
 
 static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer, uint16_t section_index, void *callback_context){
@@ -322,8 +339,11 @@ static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer
 }
 
 static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char *text = list_menu_text[cell_index->row];
-	char *sub_text = list_menu_sub_text[cell_index->row];
+	RestaurantInformation *ptr = &(s_search_result.restaurant_info[cell_index->row]);
+	char *text = ptr->name;
+	char sub_text[256];
+
+	sprintf(sub_text, "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
 	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
 }
@@ -332,9 +352,22 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 	menu_cell_basic_header_draw(ctx, cell_layer, list_menu_header_text);
 }
 
+// TODO: add detail window
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-// Currently do nothing. Consider to provide detailed information in the future.
+	int index = cell_index->row;
+
 	APP_LOG(APP_LOG_LEVEL_INFO, "%d item selected", cell_index->row);
+
+	// Check if we have detail information already
+	if(s_search_result.restaurant_info[index].address != NULL){
+		// show detail window
+		// detail_window_push();
+	}
+	else{
+		// send_detail_query((uint8_t)index);
+		// s_menu_state.user_operation = USER_OPERATION_DETAIL;
+		// push_wait_window();
+	}
 }
 
 static void list_window_load(Window *window) {
@@ -374,10 +407,11 @@ static void list_window_push(void){
 	window_stack_push(s_list_window, true);
 }
 
+// TODO: Register button press for detail
 static void result_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-	static char title_text[256], sub_text[256];  // static: keep them live longer for text_layer use
+	char title_text[256], sub_text[256];
 	RestaurantInformation *ptr;
 	uint8_t status;
 	
@@ -460,18 +494,16 @@ static int16_t setting_main_menu_get_header_height_callback(struct MenuLayer *me
 static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	char *text = setting_main_menu_text[cell_index->row];
 	char *sub_text = NULL;
-	uint8_t radius, type, opennow;
-	get_search_options(s_search_data, &radius, &type, &opennow);
 	
 	switch(cell_index->row){
-		case 0:  // distance
-			sub_text = search_distance_display_text[radius];
+		case SETTING_MENU_OPTION_RANGE:
+			sub_text = search_distance_display_text[s_user_setting.range];
 			break;
-		case 1:  // type
-			sub_text = search_type_display_text[type];
+		case SETTING_MENU_OPTION_TYPE:
+			sub_text = search_type_display_text[s_user_setting.type];
 			break;
-		case 2:  // opennow
-			sub_text = search_opennow_display_text[opennow];
+		case SETTING_MENU_OPTION_OPENNOW:
+			sub_text = search_opennow_display_text[s_user_setting.opennow];
 			break;
 		default:
 			break;
@@ -485,7 +517,7 @@ static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *ce
 }
 
 static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-	select_setting_option = cell_index->row;
+	s_menu_state.setting_menu_selected_option = cell_index->row;
 
 	setting_sub_window_push();
 }
@@ -529,14 +561,14 @@ static void setting_window_push(void){
 
 static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
 	uint16_t ret = 0;
-	switch(select_setting_option){
-		case 0:  // distance
+	switch(s_menu_state.setting_menu_selected_option){
+		case SETTING_MENU_OPTION_RANGE:
 			ret = sizeof(search_distance_display_text)/sizeof(search_distance_display_text[0]);
 			break;
-		case 1:  // type
+		case SETTING_MENU_OPTION_TYPE:
 			ret = sizeof(search_type_display_text)/sizeof(search_type_display_text[0]);
 			break;
-		case 2:  // opennow
+		case SETTING_MENU_OPTION_OPENNOW:
 			ret = sizeof(search_opennow_display_text)/sizeof(search_opennow_display_text[0]);
 			break;
 		default:
@@ -545,65 +577,61 @@ static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulay
 	return ret;
 }
 
+// TODO: Add marker icon
 static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	char *text = NULL;
 	char *sub_text = "Marked";
-	uint8_t radius, type, opennow;
 	uint8_t selected_index = 0;  // the one that is selected previously by user
-	
-	get_search_options(s_search_data, &radius, &type, &opennow);
 
-	switch(select_setting_option){
-		case 0:  // distance
-			selected_index = radius;
+	switch(s_menu_state.setting_menu_selected_option){
+		case SETTING_MENU_OPTION_RANGE:
+			selected_index = s_user_setting.range;
 			text = search_distance_display_text[cell_index->row];
 			break;
-		case 1:  // type
-			selected_index = type;
+		case SETTING_MENU_OPTION_TYPE:
+			selected_index = s_user_setting.type;
 			text = search_type_display_text[cell_index->row];
 			break;
-		case 2:  // opennow
-			selected_index = opennow;
+		case SETTING_MENU_OPTION_OPENNOW:
+			selected_index = s_user_setting.opennow;
 			text = search_opennow_display_text[cell_index->row];
 			break;
 		default:
 			break;
 	}
 
-	if(cell_index->row == selected_index)  // TODO: Add marker icon
+	if(cell_index->row == selected_index)
 		menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
 	else
 		menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
 }
 
 static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-// Once an item is selected, update search_data and close this sub_menu window
-	uint8_t radius, type, opennow;
-	uint32_t old_search_data;
+	UserSetting old;
 
-	old_search_data = s_search_data;
-	get_search_options(s_search_data, &radius, &type, &opennow);
-	switch(select_setting_option){
-		case 0:  // distance
-			radius = cell_index->row;
+	memcpy(old, s_user_setting, sizeof(old));
+
+	switch(s_menu_state.setting_menu_selected_option){
+		case SETTING_MENU_OPTION_RANGE:
+			s_user_setting.range = cell_index->row;
 			break;
-		case 1:  // type
-			type = cell_index->row;
+		case SETTING_MENU_OPTION_TYPE:
+			s_user_setting.range = cell_index->row;
 			break;
-		case 2:  // opennow
-			opennow = cell_index->row;
+		case SETTING_MENU_OPTION_OPENNOW:
+			s_user_setting.range = cell_index->row;
 			break;
 		default:
 			break;
 	}
-	s_search_data = compute_search_data(radius, type, opennow);
-	if(old_search_data != s_search_data){
+	if(memcmp(s_user_setting, old, sizeof(s_user_setting))){
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed");
-		is_setting_changed = true;
+		s_search_result.is_setting_changed = true;
 	}
 	else
-		is_setting_changed = false;
+		s_search_result.is_setting_changed = false;
 
+	// Once an item is selected, close this sub_menu window
 	window_stack_pop(true);
 }
 
@@ -710,6 +738,7 @@ static void wait_window_disappear(Window *window) {
 	}
 }
 
+// TODO: add a timeout so we won't keep waiting for message
 static void wait_window_push(void){
 	if(!s_wait_window){
 		// Create wait window
@@ -725,9 +754,10 @@ static void wait_window_push(void){
 }
 
 // Parse the returned list dictionary data and store to s_search_result
-static void parse_list_message_handler(DictionaryIterator *iterator){
+static int parse_list_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
 	int index;
+	int ret = DATA_INVALID;
 	RestaurantInformation *ptr;
 	char buf[2][256];
 	char errmsg[256];
@@ -768,25 +798,29 @@ static void parse_list_message_handler(DictionaryIterator *iterator){
 	if(s_search_result.query_status == QUERY_STATUS_SUCCESS){
 		s_search_result.last_query_time = time(NULL);
 		s_search_result.is_setting_changed = false;
+		ret = DATA_VALID;
 	}
 	else if(s_search_result.query_status == QUERY_STATUS_GOOGLE_API_ERROR){
 		s_search_result.api_error_message = alloc_and_copy_string(errmsg);
 	}
+
+	return ret;
 }
 
 // Parse the returned list dictionary data and store to s_search_result
-static void parse_detail_message_handler(DictionaryIterator *iterator){
+static int parse_detail_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
-	uint8_t detail_query_status, rating;
+	uint8_t rating;
 	char buf[2][256];
 	char errmsg[256];
-	int index;
+	int index = -1;
+	int ret = DATA_INVALID;
 
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
 
 	switch(t->key){
 		case KEY_STATUS:
-			detail_query_status = t->value->uint8;
+			s_search_result.query_status = t->value->uint8;
 			break;
 		case KEY_QUERY_ERROR_MESSAGE:
 			strncpy(errmsg, t->value->cstring, sizeof(errmsg));
@@ -809,52 +843,75 @@ static void parse_detail_message_handler(DictionaryIterator *iterator){
 			break;
 	}
 
+	// if we failed to find corresponding restaurant, consider this query returns no result
+	if(index < 0){
+		s_search_result.query_status = QUERY_STATUS_NO_RESULT;
+	}
+
 	// Store the information if everything is OK
-	if((detail_query_status==QUERY_STATUS_SUCCESS) && (index >= 0)){
+	if(s_search_result.query_status == QUERY_STATUS_SUCCESS){
 		s_search_result.restaurant_info[index].address = alloc_and_copy_string(buf[0]);
 		s_search_result.restaurant_info[index].phone = alloc_and_copy_string(buf[1]);
 		s_search_result.restaurant_info[index].rating = rating;
+		ret = DATA_VALID;
 	}
 	else if(s_search_result.query_status == QUERY_STATUS_GOOGLE_API_ERROR){
 		s_search_result.api_error_message = alloc_and_copy_string(errmsg);
 	}
+	return ret;
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
 	Tuple *t = dict_read_first(iterator);
+	int parse_result = DATA_INVALID;
+	uint8_t message_uid, message_query_type;
+	uint8_t expect_uid = (uint8_t)(s_search_result.uid_next - 1);
 	Window *top_window;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
 	s_search_result.is_querying = false;  // reset the flag
+	s_search_result.is_setting_changed = false;
 
 	while(t!=NULL){
-		if(t->key == KEY_QUERY_TYPE){
-			if(t->value->uint8 == QUERY_TYPE_LIST)
-				parse_list_message_handler(iterator);
-			else if(t->value->uint8 == QUERY_TYPE_DETAIL)
-				parse_detail_message_handler(iterator);
-			else
-				APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
-			break;
-		}
+		if(t->key == KEY_QUERY_TYPE)
+			message_query_type = t->value->uint8;
+		else if(t->key == KEY_QUERY_UID)
+			message_uid = t->value->uint8;
 		t = dict_read_next(iterator);
 	}
 
+	if(returned_query_type == QUERY_TYPE_LIST)
+		parse_result = parse_list_message_handler(iterator);
+	else if(returned_query_type == QUERY_TYPE_DETAIL)
+		parse_result = parse_detail_message_handler(iterator);
+	else
+		APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
+
 	// Check current window
-	// If we are waiting, display the list or result window
+	// If we are waiting, display the list, result or detail window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		if(s_menu_state->user_operation == USER_OPERATION_RANDOM){
-			result_window_push();
-		}
-		else if(s_menu_state->user_operation == USER_OPERATION_LIST){
-			// if we have failed query, still display result window with error message
-			if(s_search_result->query_status == QUERY_STATUS_SUCCESS)
-				list_window_push();
-			else
+		// Must make sure we received the query that we expected before display
+		if(expect_uid == message_uid){
+			if(s_menu_state->user_operation == USER_OPERATION_RANDOM){
 				result_window_push();
+			}
+			else if(s_menu_state->user_operation == USER_OPERATION_LIST){
+				// if the result is invalid, still display result window with error message
+				if(parse_result != DATA_VALID)
+					result_window_push();
+				else
+					list_window_push();
+			}
+			else if(s_menu_state->user_operation == USER_OPERATION_DETAIL){
+				// if the result is invalid, still display result window with error message
+				//if(parse_result != DATA_VALID)
+				//	result_window_push();
+				//else
+				//	detail_window_push();
+			}
+			window_stack_remove(s_wait_window, false);
 		}
-		window_stack_remove(s_wait_window, false);
 	}
 }
 
@@ -884,6 +941,7 @@ static void init(){
 	s_search_result.num_of_restaurant = 0;
 	s_search_result.query_status = QUERY_STATUS_NO_RESULT;
 	s_search_result.random_result = 0;
+	s_search_result.uid_next = 0;
 	s_search_result.is_querying = false;
 	s_search_result.is_setting_changed = false;
 	if(persist_exists(PERSIST_KEY_USER_SETTING))
