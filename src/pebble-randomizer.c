@@ -315,17 +315,14 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Main Menu Select: %d", (int)(s_menu_state.user_operation));
 
-	// free the space if the data are invalid
-	if(valid_result == false)
-		free_search_result();
-
-	switch(cell_index->row){
+	switch(s_menu_state.user_operation){
 		case USER_OPERATION_RANDOM:
 			if(valid_result)
 				result_window_push();
 			else{
 				if(is_querying == false)
 					send_list_query();
+				free_search_result();
 				wait_window_push();
 			}
 			break;
@@ -335,6 +332,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 			else{
 				if(is_querying == false)
 					send_list_query();
+				free_search_result();
 				wait_window_push();
 			}
 			break;
@@ -450,12 +448,11 @@ static void list_window_push(void){
 static void result_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-	char title_text[256], sub_text[256];
+	static char title_text[256], sub_text[256];
 	RestaurantInformation *ptr;
 	uint8_t status;
 	
-	APP_LOG(APP_LOG_LEVEL_INFO, "Result load");
-
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window load");
 	status = s_search_result.query_status;
 	switch(status){
 		case QUERY_STATUS_SUCCESS:
@@ -483,7 +480,6 @@ static void result_window_load(Window *window) {
 			snprintf(sub_text, sizeof(sub_text), "%s %s%d", unknown_error_sub_message, "Incorrect query status:",status);
 			break;
 	}
-
 	// title part
 	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, (bounds.size.h/2)));
 	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
@@ -503,6 +499,8 @@ static void result_window_load(Window *window) {
 }
 
 static void result_window_unload(Window *window) {
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window unload");
+
 	text_layer_destroy(s_result_title_text_layer);
 	text_layer_destroy(s_result_sub_text_layer);
 
@@ -511,7 +509,9 @@ static void result_window_unload(Window *window) {
 }
 
 static void result_window_push(void){
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window push");
 	if(!s_result_window){
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Create new result window");
 		// Create result window
 		s_result_window = window_create();
 		window_set_window_handlers(s_result_window, (WindowHandlers){
@@ -519,6 +519,7 @@ static void result_window_push(void){
 			.unload = result_window_unload
 		});
 	}
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "About to push result window to stack");
 	window_stack_push(s_result_window, true);
 }
 
@@ -838,12 +839,11 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
 	int index, len, head;
 	int ret = DATA_INVALID;
-	RestaurantInformation *ptr;
 	char buf[256], temp_name[256], temp_place_id[256], temp_direction[4], temp_distance[16];
 	char errmsg[256];
 
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
-	
+
 	index = 0;
 	while(t != NULL) {
 		switch(t->key){
@@ -864,27 +864,26 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 					strncpy(temp_name, &buf[head], len);
 					temp_name[len] = '\0';
 					// direction
-					head+=len;
+					head = head + len + 1;
 					len = find_next_seperator(&buf[head], '|');
 					strncpy(temp_direction, &buf[head], len);
 					temp_direction[len] = '\0';
 					// distance
-					head+=len;
+					head = head + len + 1;
 					len = find_next_seperator(&buf[head], '|');
 					strncpy(temp_distance, &buf[head], len);
 					temp_distance[len] = '\0';
 					// placeid
-					head+=len;
+					head = head + len + 1;
 					len = find_next_seperator(&buf[head], '|');
 					strncpy(temp_place_id, &buf[head], len);
 					temp_place_id[len] = '\0';
 					// Assign value
-					ptr = &(s_search_result.restaurant_info[index]);
-					ptr->name = alloc_and_copy_string(temp_name);
-					ptr->direction = (uint8_t)atoi(temp_direction);
-					ptr->distance = (uint16_t)atoi(temp_distance);
-					ptr->place_id = alloc_and_copy_string(temp_place_id);
-
+					APP_LOG(APP_LOG_LEVEL_DEBUG, "%s %s %s %s", temp_name, temp_direction, temp_distance, temp_place_id);
+					s_search_result.restaurant_info[index].name = alloc_and_copy_string(temp_name);
+					s_search_result.restaurant_info[index].direction = (uint8_t)atoi(temp_direction);
+					s_search_result.restaurant_info[index].distance = (uint16_t)atoi(temp_distance);
+					s_search_result.restaurant_info[index].place_id = alloc_and_copy_string(temp_place_id);
 					index++;
 				}
 				else
@@ -983,7 +982,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 		t = dict_read_next(iterator);
 	}
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "query_type:%d uid:%d parse_result:%d", (int)message_query_type, (int)message_uid, (int)parse_result);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "query_type:%d uid:%d", (int)message_query_type, (int)message_uid);
 
 	if(message_query_type == QUERY_TYPE_LIST)
 		parse_result = parse_list_message_handler(iterator);
@@ -992,13 +991,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	else
 		APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
 
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_result=%d query_status=%d", parse_result, s_search_result.query_status);
+
 	// Check current window
 	// If we are waiting, display the list, result or detail window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Is waiting");
 		// Must make sure we received the query that we expected before display
 		if(expect_uid == message_uid){
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "UID matched");
 			if(s_menu_state.user_operation == USER_OPERATION_RANDOM){
+				APP_LOG(APP_LOG_LEVEL_DEBUG, "operation random");
 				result_window_push();
 			}
 			else if(s_menu_state.user_operation == USER_OPERATION_LIST){

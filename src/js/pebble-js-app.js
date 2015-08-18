@@ -75,6 +75,16 @@ function locationSuccess(pos){
 			"placeid=" + g_place_id +
 			"&key=" + api_key;
 	}
+	else {
+		console.log("Unknown query type: " + g_query_type + "!");
+		// in this case, we send list query
+		url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
+			"location=" + pos.coords.latitude + "," + pos.coords.longitude +
+			"&radius=" + g_range_text[g_option_range] + 
+			"&types=" + g_type_text[g_option_type] +
+			g_opennow_text[g_option_opennow] +
+			"&key=" + api_key;
+	}
 	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
@@ -153,12 +163,13 @@ function locationError(err){
 	//console.log("Location error: code=" + err.code + " msg=" + err.message);
 	dictionary['status'] = status_code['timeout'];
 	dictionary['query_uid'] = g_query_uid;
+	dictionary['query_type'] = g_query_type;
 	Pebble.sendAppMessage(dictionary,
 		function(e) {
-			console.log("List sent to Pebble successfully!");
+			console.log("Timeout: List sent to Pebble successfully!");
 		},
 		function(e) {
-			console.log("Error sending list info to Pebble!");
+			console.log("Timeout: Error sending list info to Pebble!");
 		}
 	);
 }
@@ -186,6 +197,7 @@ Pebble.addEventListener("appmessage",
 	function(e) {
 		g_query_type = e.payload['query_type'];
 		g_query_uid = e.payload['query_uid'];
+		console.log("e.payload['query_type']="+e.payload['query_type']+" e.payload['query_uid']="+e.payload['query_uid']);
 		if(g_query_type == 0){ // list
 			g_option_range = e.payload['query_option_range'];
 			g_option_type = e.payload['query_option_type'];
