@@ -96,6 +96,7 @@ function locationSuccess(pos){
 					dictionary['query_type'] = 0;
 					key = list_first_key;
 					for(i in json.results){
+						console.log("i = " + i);
 						lat = json.results[i].geometry.location.lat;
 						lon = json.results[i].geometry.location.lng;
 						place_id = json.results[i].place_id;
@@ -106,10 +107,10 @@ function locationSuccess(pos){
 							    " direction: " + direction + 
 							    " distance: " + distance +
 							    " place_id: " + place_id);
-						dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + placeid;
+						dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + place_id;
 						key++;
 					}
-					if(key == 1)  // didn't get any result
+					if(key == list_first_key)  // didn't get any result
 						dictionary['status'] = status_code['no_result'];
 					else
 						dictionary['status'] = status_code['success'];
@@ -131,6 +132,7 @@ function locationSuccess(pos){
 				dictionary['status'] = status_code['api_error'];
 				dictionary['query_uid'] = g_query_uid;
 				dictionary['error_message'] = e.message;
+				console.log('error_message = ' + e.message);
 			}
 
 			// Send to Pebble

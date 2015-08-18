@@ -917,7 +917,7 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 	int index = -1;
 	int ret = DATA_INVALID;
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_detail_message_handler");
 
 	switch(t->key){
 		case KEY_STATUS:
@@ -982,6 +982,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 		}
 		t = dict_read_next(iterator);
 	}
+
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "query_type:%d uid:%d parse_result:%d", (int)message_query_type, (int)message_uid, (int)parse_result);
 
 	if(message_query_type == QUERY_TYPE_LIST)
 		parse_result = parse_list_message_handler(iterator);
