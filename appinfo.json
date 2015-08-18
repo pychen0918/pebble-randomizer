@@ -13,8 +13,17 @@
     "location"
   ],
   "appKeys": {
-    "dummy": 0,
-    "search_option": 99
+    "status": 0,
+    "query_type": 1,
+    "query_place_id": 2,
+    "query_error_message": 3,
+    "query_uid": 4,
+    "query_option_range": 10,
+    "query_option_type": 11,
+    "query_option_opennow": 12,
+    "detail_address": 20,
+    "detail_phone": 21,
+    "detail_rating": 22
   },
   "resources": {
     "media": []

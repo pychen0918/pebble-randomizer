@@ -10,9 +10,9 @@
 #define MAIN_MENU_TEXT_LENGTH		64
 
 // What kind of operation user is currently performing
-#define USER_OPERATION_RANDOM		0
-#define USER_OPERATION_LIST		1
-#define USER_OPERATION_SETTING		2
+#define USER_OPERATION_RANDOM		MAIN_MENU_OPTION_RANDOM
+#define USER_OPERATION_LIST		MAIN_MENU_OPTION_LIST
+#define USER_OPERATION_SETTING		MAIN_MENU_OPTION_SETTING
 #define USER_OPERATION_DETAIL		3
 
 #define LIST_MENU_ROWS  		SEARCH_RESULT_MAX_DATA_NUMBER
@@ -44,6 +44,11 @@
 #define QUERY_STATUS_GOOGLE_API_ERROR	3
 #define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
 #define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
+#define QUERY_TYPE_INVALID		2
+
+#define MESSAGE_UID_INVALID		0
+#define MESSAGE_UID_FIRST		1
+#define MESSAGE_UID_MAX			255
 
 #define DATA_VALID			0
 #define DATA_INVALID			1
@@ -162,6 +167,21 @@ static Window *s_wait_window;
 static TextLayer *s_wait_text_layer;
 static Layer *s_wait_layer;
 
+// The detail window
+static Window *s_detail_window;
+static TextLayer *s_detail_text_layer;
+
+// --------------------------------------------------------------------------------------
+// XXX: Function Prototypes
+// --------------------------------------------------------------------------------------
+static void list_window_push(void);
+static void result_window_push(void);
+static void setting_window_push(void);
+static void setting_sub_window_push(void);
+static void wait_window_push(void);
+static void detail_window_push(void);
+static void wait_animation_next_timer(void);
+
 // --------------------------------------------------------------------------------------
 // XXX: Common functions
 // --------------------------------------------------------------------------------------
@@ -178,12 +198,32 @@ static bool validate_data(void){
 	return false;
 }
 
+// Get next uid. Note '0' is not a valid uid.
+// It will update uid_next as well.
+static uint8_t get_next_uid(void){
+	uint8_t temp;
+	temp = s_search_result.uid_next;
+	s_search_result.uid_next = (s_search_result.uid_next+1)%MESSAGE_UID_MAX;
+	if(s_search_result.uid_next==MESSAGE_UID_INVALID)
+		s_search_result.uid_next = MESSAGE_UID_FIRST;
+	return temp;
+}
+
+// Get previous uid. Note '0' is not a valid uid
+static uint8_t get_previous_uid(void){
+	uint8_t temp;
+	temp = (s_search_result.uid_next - 1 + MESSAGE_UID_MAX)%MESSAGE_UID_MAX;
+	if(temp == MESSAGE_UID_INVALID)
+		temp = MESSAGE_UID_MAX;
+	return temp;
+}
+
 // Send out the 'list' query to retrieve 20 nearby restaurant info
 static void send_list_query(void){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_LIST);
-	dict_write_uint8(iter, KEY_QUERY_UID, s_search_result.uid_next++);
+	dict_write_uint8(iter, KEY_QUERY_UID, get_next_uid());
 	dict_write_uint8(iter, KEY_QUERY_OPTION_RANGE, s_user_setting.range);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_TYPE, s_user_setting.type);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_OPENNOW, s_user_setting.opennow);
@@ -196,7 +236,7 @@ static void send_detail_query(uint8_t store_index){
 	DictionaryIterator *iter;
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_DETAIL);
-	dict_write_uint8(iter, KEY_QUERY_UID, s_search_result.uid_next++);
+	dict_write_uint8(iter, KEY_QUERY_UID, get_next_uid());
 	dict_write_cstring(iter, KEY_QUERY_PLACE_ID, s_search_result.restaurant_info[store_index].place_id);
 	app_message_outbox_send();
 }
@@ -232,7 +272,7 @@ static void free_search_result(void){
 	int i;
 	RestaurantInformation *ptr = s_search_result.restaurant_info;
 
-	for(i=0;i<MAX_DATA_NUMBER;i++){
+	for(i=0;i<SEARCH_RESULT_MAX_DATA_NUMBER;i++){
 		if((ptr+i)->name != NULL){
 			free((ptr+i)->name);
 			(ptr+i)->name = NULL;
@@ -261,20 +301,19 @@ static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uin
 }
 
 static void main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char* text = main_menu_text[cell_index->row];
+	const char* text = main_menu_text[cell_index->row];
 
 	menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
 }
 
 static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-	time_t now;
 	bool valid_result = false;
 	bool is_querying = s_search_result.is_querying;
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Select Click");
-
 	valid_result = validate_data();
-	s_menu_state.main_menu_selected_option = cell_index->row;
+	s_menu_state.user_operation = cell_index->row;
+
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Main Menu Select: %d", (int)(s_menu_state.user_operation));
 
 	// free the space if the data are invalid
 	if(valid_result == false)
@@ -286,7 +325,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 				result_window_push();
 			else{
 				if(is_querying == false)
-					send_query();
+					send_list_query();
 				wait_window_push();
 			}
 			break;
@@ -295,7 +334,7 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 				list_window_push();
 			else{
 				if(is_querying == false)
-					send_query();
+					send_list_query();
 				wait_window_push();
 			}
 			break;
@@ -343,7 +382,7 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 	char *text = ptr->name;
 	char sub_text[256];
 
-	sprintf(sub_text, "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
+	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
 	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
 }
@@ -423,7 +462,7 @@ static void result_window_load(Window *window) {
 			// Randomly pick up the restaurant
 			s_search_result.random_result = rand()%s_search_result.num_of_restaurant;
 			// Collect required fields
-			ptr = s_search_result.restaurant_info[s_search_result.random_result];
+			ptr = &(s_search_result.restaurant_info[s_search_result.random_result]);
 			strncpy(title_text, ptr->name, sizeof(title_text));
 			snprintf(sub_text, sizeof(sub_text), "%s %u %s", direction_name[ptr->direction], (unsigned int)(ptr->distance), distance_unit);
 			break;
@@ -431,12 +470,12 @@ static void result_window_load(Window *window) {
 		case QUERY_STATUS_GPS_TIMEOUT:
 			// Set corresponding error messages to title and subtitle
 			strncpy(title_text, query_status_error_message[status], sizeof(title_text));
-			strncpy(sub_text, query_status_sub_error_message[status], sizeof(sub_text));
+			strncpy(sub_text, query_status_error_sub_message[status], sizeof(sub_text));
 			break;
 		case QUERY_STATUS_GOOGLE_API_ERROR:
 			// Collect error message from returned information
 			strncpy(title_text, query_status_error_message[status], sizeof(title_text));
-			strncpy(sub_text, ptr->api_error_message, sizeof(sub_text));
+			strncpy(sub_text, s_search_result.api_error_message, sizeof(sub_text));
 			break;
 		default:
 			// Other query status = unknown error
@@ -492,18 +531,18 @@ static int16_t setting_main_menu_get_header_height_callback(struct MenuLayer *me
 }
 
 static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char *text = setting_main_menu_text[cell_index->row];
-	char *sub_text = NULL;
+	const char *text = setting_main_menu_text[cell_index->row];
+	const char *sub_text = NULL;
 	
 	switch(cell_index->row){
 		case SETTING_MENU_OPTION_RANGE:
-			sub_text = search_distance_display_text[s_user_setting.range];
+			sub_text = setting_range_option_text[s_user_setting.range];
 			break;
 		case SETTING_MENU_OPTION_TYPE:
-			sub_text = search_type_display_text[s_user_setting.type];
+			sub_text = setting_type_option_text[s_user_setting.type];
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
-			sub_text = search_opennow_display_text[s_user_setting.opennow];
+			sub_text = setting_opennow_option_text[s_user_setting.opennow];
 			break;
 		default:
 			break;
@@ -563,13 +602,13 @@ static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulay
 	uint16_t ret = 0;
 	switch(s_menu_state.setting_menu_selected_option){
 		case SETTING_MENU_OPTION_RANGE:
-			ret = sizeof(search_distance_display_text)/sizeof(search_distance_display_text[0]);
+			ret = sizeof(setting_range_option_text)/sizeof(setting_range_option_text[0]);
 			break;
 		case SETTING_MENU_OPTION_TYPE:
-			ret = sizeof(search_type_display_text)/sizeof(search_type_display_text[0]);
+			ret = sizeof(setting_type_option_text)/sizeof(setting_type_option_text[0]);
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
-			ret = sizeof(search_opennow_display_text)/sizeof(search_opennow_display_text[0]);
+			ret = sizeof(setting_opennow_option_text)/sizeof(setting_opennow_option_text[0]);
 			break;
 		default:
 			break;
@@ -579,22 +618,22 @@ static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulay
 
 // TODO: Add marker icon
 static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	char *text = NULL;
-	char *sub_text = "Marked";
+	const char *text = NULL;
+	const char *sub_text = "Marked";
 	uint8_t selected_index = 0;  // the one that is selected previously by user
 
 	switch(s_menu_state.setting_menu_selected_option){
 		case SETTING_MENU_OPTION_RANGE:
 			selected_index = s_user_setting.range;
-			text = search_distance_display_text[cell_index->row];
+			text = setting_range_option_text[cell_index->row];
 			break;
 		case SETTING_MENU_OPTION_TYPE:
 			selected_index = s_user_setting.type;
-			text = search_type_display_text[cell_index->row];
+			text = setting_type_option_text[cell_index->row];
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
 			selected_index = s_user_setting.opennow;
-			text = search_opennow_display_text[cell_index->row];
+			text = setting_opennow_option_text[cell_index->row];
 			break;
 		default:
 			break;
@@ -609,7 +648,7 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	UserSetting old;
 
-	memcpy(old, s_user_setting, sizeof(old));
+	memcpy(&old, &s_user_setting, sizeof(old));
 
 	switch(s_menu_state.setting_menu_selected_option){
 		case SETTING_MENU_OPTION_RANGE:
@@ -624,7 +663,7 @@ static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuI
 		default:
 			break;
 	}
-	if(memcmp(s_user_setting, old, sizeof(s_user_setting))){
+	if(memcmp(&old, &s_user_setting, sizeof(old))){
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed");
 		s_search_result.is_setting_changed = true;
 	}
@@ -669,8 +708,6 @@ static void setting_sub_window_push(void){
 	}
 	window_stack_push(s_setting_sub_window, true);
 }
-
-static void wait_animation_next_timer(void);
 
 static void wait_animation_timer_callback(void *context){
 	s_wait_animation_counter += (s_wait_animation_counter < 100) ? 1 : -100;
@@ -753,13 +790,56 @@ static void wait_window_push(void){
 	window_stack_push(s_wait_window, true);
 }
 
+static void detail_window_load(Window *window) {
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+	
+	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
+
+	s_detail_text_layer = text_layer_create(bounds);
+	text_layer_set_font(s_detail_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+	text_layer_set_text_alignment(s_detail_text_layer, GTextAlignmentLeft);
+	text_layer_set_background_color(s_detail_text_layer, GColorClear);
+	text_layer_set_text_color(s_detail_text_layer, GColorBlack);
+	// TODO: Add detail
+	text_layer_set_text(s_detail_text_layer, "Detail...");
+	layer_add_child(window_layer, text_layer_get_layer(s_detail_text_layer));
+}
+
+static void detail_window_unload(Window *window) {
+	text_layer_destroy(s_detail_text_layer);
+
+	window_destroy(window);
+	s_detail_window = NULL;
+}
+
+static void detail_window_push(void){
+	if(!s_detail_window){
+		// Create result window
+		s_detail_window = window_create();
+		window_set_window_handlers(s_detail_window, (WindowHandlers){
+			.load = detail_window_load,
+			.unload = detail_window_unload
+		});
+	}
+	window_stack_push(s_detail_window, true);
+}
+
+static int find_next_seperator(const char *string, const char seperator){
+	int i=0;
+	while(string[i]!='\0' && string[i]!=seperator){
+		i++;
+	}
+	return i;
+}
+
 // Parse the returned list dictionary data and store to s_search_result
 static int parse_list_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
-	int index;
+	int index, len, head;
 	int ret = DATA_INVALID;
 	RestaurantInformation *ptr;
-	char buf[2][256];
+	char buf[256], temp_name[256], temp_place_id[256], temp_direction[4], temp_distance[16];
 	char errmsg[256];
 
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
@@ -775,15 +855,36 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 				break;
 			default:
 				//  Check if the key fall in the data range
-				if((t->key >= KEY_LIST_FIRST) && (t->key < (KEY_LIST_FIRST + MAX_DATA_NUMBER))){
-					ptr = s_search_result.restaurant_info[index];
+				if((t->key >= KEY_LIST_FIRST) && (t->key < (KEY_LIST_FIRST + SEARCH_RESULT_MAX_DATA_NUMBER))){
 					// value string format: Restaurant name|Direction|Distance|placeid
-					sscanf(t->value->cstring, "%s|%u|%u|%s", buf[0], ptr->direction, ptr->distance, buf[1]);
-					ptr->name = alloc_and_copy_string(buf[0]);
-					ptr->place_id = alloc_and_copy_string(buf[1]);
+					strncpy(buf, t->value->cstring, sizeof(buf));
+					len = head = 0;
+					// name
+					len = find_next_seperator(&buf[head], '|');
+					strncpy(temp_name, &buf[head], len);
+					temp_name[len] = '\0';
+					// direction
+					head+=len;
+					len = find_next_seperator(&buf[head], '|');
+					strncpy(temp_direction, &buf[head], len);
+					temp_direction[len] = '\0';
+					// distance
+					head+=len;
+					len = find_next_seperator(&buf[head], '|');
+					strncpy(temp_distance, &buf[head], len);
+					temp_distance[len] = '\0';
+					// placeid
+					head+=len;
+					len = find_next_seperator(&buf[head], '|');
+					strncpy(temp_place_id, &buf[head], len);
+					temp_place_id[len] = '\0';
+					// Assign value
+					ptr = &(s_search_result.restaurant_info[index]);
+					ptr->name = alloc_and_copy_string(temp_name);
+					ptr->direction = (uint8_t)atoi(temp_direction);
+					ptr->distance = (uint16_t)atoi(temp_distance);
+					ptr->place_id = alloc_and_copy_string(temp_place_id);
 
-					APP_LOG(APP_LOG_LEVEL_DEBUG, "index:%d key:%d name:%s direction:%d distance:%d place_id:%s", 
-						index, t->key, ptr->name, ptr->direction, ptr->distance, ptr->place_id);
 					index++;
 				}
 				else
@@ -810,7 +911,7 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 // Parse the returned list dictionary data and store to s_search_result
 static int parse_detail_message_handler(DictionaryIterator *iterator){
 	Tuple *t = dict_read_first(iterator);
-	uint8_t rating;
+	uint8_t rating = 0;
 	char buf[2][256];
 	char errmsg[256];
 	int index = -1;
@@ -864,8 +965,8 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
 	Tuple *t = dict_read_first(iterator);
 	int parse_result = DATA_INVALID;
-	uint8_t message_uid, message_query_type;
-	uint8_t expect_uid = (uint8_t)(s_search_result.uid_next - 1);
+	uint8_t message_uid = MESSAGE_UID_INVALID, message_query_type = QUERY_TYPE_INVALID;
+	uint8_t expect_uid = get_previous_uid();
 	Window *top_window;
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
@@ -873,16 +974,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	s_search_result.is_setting_changed = false;
 
 	while(t!=NULL){
-		if(t->key == KEY_QUERY_TYPE)
+		if(t->key == KEY_QUERY_TYPE){
 			message_query_type = t->value->uint8;
-		else if(t->key == KEY_QUERY_UID)
+		}
+		else if(t->key == KEY_QUERY_UID){
 			message_uid = t->value->uint8;
+		}
 		t = dict_read_next(iterator);
 	}
 
-	if(returned_query_type == QUERY_TYPE_LIST)
+	if(message_query_type == QUERY_TYPE_LIST)
 		parse_result = parse_list_message_handler(iterator);
-	else if(returned_query_type == QUERY_TYPE_DETAIL)
+	else if(message_query_type == QUERY_TYPE_DETAIL)
 		parse_result = parse_detail_message_handler(iterator);
 	else
 		APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
@@ -893,17 +996,17 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	if(top_window == s_wait_window){
 		// Must make sure we received the query that we expected before display
 		if(expect_uid == message_uid){
-			if(s_menu_state->user_operation == USER_OPERATION_RANDOM){
+			if(s_menu_state.user_operation == USER_OPERATION_RANDOM){
 				result_window_push();
 			}
-			else if(s_menu_state->user_operation == USER_OPERATION_LIST){
+			else if(s_menu_state.user_operation == USER_OPERATION_LIST){
 				// if the result is invalid, still display result window with error message
 				if(parse_result != DATA_VALID)
 					result_window_push();
 				else
 					list_window_push();
 			}
-			else if(s_menu_state->user_operation == USER_OPERATION_DETAIL){
+			else if(s_menu_state.user_operation == USER_OPERATION_DETAIL){
 				// if the result is invalid, still display result window with error message
 				//if(parse_result != DATA_VALID)
 				//	result_window_push();
@@ -941,17 +1044,17 @@ static void init(){
 	s_search_result.num_of_restaurant = 0;
 	s_search_result.query_status = QUERY_STATUS_NO_RESULT;
 	s_search_result.random_result = 0;
-	s_search_result.uid_next = 0;
+	s_search_result.uid_next = MESSAGE_UID_FIRST;
 	s_search_result.is_querying = false;
 	s_search_result.is_setting_changed = false;
 	if(persist_exists(PERSIST_KEY_USER_SETTING))
-		persist_read_data(PERSIST_KEY_USER_SETTING, &s_user_setting);
+		persist_read_data(PERSIST_KEY_USER_SETTING, &s_user_setting, sizeof(s_user_setting));
 	else{
-		s_user_setting.range_index = DEFAULT_SEARCH_RANGE;
-		s_user_setting.type_index = DEFAULT_SEARCH_TYPE;
-		s_user_setting.opennow_index = DEFAULT_SEARCH_OPENNOW;
+		s_user_setting.range = DEFAULT_SEARCH_RANGE;
+		s_user_setting.type = DEFAULT_SEARCH_TYPE;
+		s_user_setting.opennow = DEFAULT_SEARCH_OPENNOW;
 	}
-	s_menu_state.main_menu_selected_option = MAIN_MENU_OPTION_RANDOM;
+	s_menu_state.user_operation = USER_OPERATION_RANDOM;
 	s_menu_state.setting_menu_selected_option = SETTING_MENU_OPTION_RANGE;
 
 	// Create main window
