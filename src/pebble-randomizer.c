@@ -656,10 +656,10 @@ static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuI
 			s_user_setting.range = cell_index->row;
 			break;
 		case SETTING_MENU_OPTION_TYPE:
-			s_user_setting.range = cell_index->row;
+			s_user_setting.type = cell_index->row;
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
-			s_user_setting.range = cell_index->row;
+			s_user_setting.opennow = cell_index->row;
 			break;
 		default:
 			break;
@@ -961,6 +961,7 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 	return ret;
 }
 
+// TODO: sort list result by distance
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
 	Tuple *t = dict_read_first(iterator);
 	int parse_result = DATA_INVALID;
