@@ -24,6 +24,7 @@
 #define WAIT_ANIMATION_BAR_RIGHT_MARGIN	10
 #define WAIT_ANIMATION_BAR_HEIGHT	6
 #define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
+#define WAIT_WINDOW_TIMEOUT		25000	// Wait window should timeout in 25 seconds. js location looking has only 20 seconds timeout.
 #define WAIT_TEXT_LAYER_HEIGHT		32
 
 // If changed the following status code, the js file might need to be updated
@@ -132,8 +133,9 @@ static SearchResult s_search_result;	// The main data structure to store the ret
 static UserSetting s_user_setting;	// The main data structure to store custom searching configuations.
 static MenuState s_menu_state;		// The main data structure to store user's selection on the menu
 
-static AppTimer *s_wait_animation_timer;// Timers for waiting animation
+static AppTimer *s_wait_animation_timer;// Timer for waiting animation
 static int s_wait_animation_counter = 0;
+static AppTimer *s_wait_timeout_timer;	// Timer for dismissing waiting window
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -702,6 +704,14 @@ static void setting_sub_window_push(void){
 	window_stack_push(s_setting_sub_window, true);
 }
 
+static void wait_timeout_timer_callback(void *context){
+	// Forge result and call result window
+	s_search_result.is_querying = false;
+	s_search_result.query_status = QUERY_STATUS_GPS_TIMEOUT;
+	result_window_push();
+	window_stack_remove(s_wait_window, false);
+}
+
 static void wait_animation_timer_callback(void *context){
 	s_wait_animation_counter += (s_wait_animation_counter < 100) ? 1 : -100;
 	layer_mark_dirty(s_wait_layer);
@@ -759,6 +769,7 @@ static void wait_window_unload(Window *window) {
 static void wait_window_appear(Window *window) {
 	s_wait_animation_counter = 0;
 	wait_animation_next_timer();
+	s_wait_timeout_timer = app_timer_register(WAIT_WINDOW_TIMEOUT, wait_timeout_timer_callback, NULL); 
 }
 
 static void wait_window_disappear(Window *window) {
@@ -766,9 +777,12 @@ static void wait_window_disappear(Window *window) {
 		app_timer_cancel(s_wait_animation_timer);
 		s_wait_animation_timer = NULL;
 	}
+	if(s_wait_timeout_timer){
+		app_timer_cancel(s_wait_timeout_timer);
+		s_wait_timeout_timer = NULL;
+	}
 }
 
-// TODO: add a timeout so we won't keep waiting for message
 static void wait_window_push(void){
 	if(!s_wait_window){
 		// Create wait window
