@@ -4,28 +4,19 @@
 #define SEARCH_RESULT_AGE_TIMEOUT	60 	// How long the list is valid in seconds
 
 #define MAIN_MENU_ROWS			3	// Random, list and settings
-#define MAIN_MENU_OPTION_RANDOM		0
-#define MAIN_MENU_OPTION_LIST		1
-#define MAIN_MENU_OPTION_SETTING	2
 #define MAIN_MENU_TEXT_LENGTH		64
 
 // What kind of operation user is currently performing
-#define USER_OPERATION_RANDOM		MAIN_MENU_OPTION_RANDOM
-#define USER_OPERATION_LIST		MAIN_MENU_OPTION_LIST
-#define USER_OPERATION_SETTING		MAIN_MENU_OPTION_SETTING
+#define USER_OPERATION_RANDOM		0
+#define USER_OPERATION_LIST		1
+#define USER_OPERATION_SETTING		2
 #define USER_OPERATION_DETAIL		3
 
-#define LIST_MENU_ROWS  		SEARCH_RESULT_MAX_DATA_NUMBER
-#define LIST_MENU_TEXT_LENGTH		128
-#define LIST_MENU_SUB_TEXT_LENGTH	16
 #define LIST_MENU_HEADER_HEIGHT 	18
 
-#define SETTING_MENU_ROWS		3	// Range, Type, Open Now
 #define SETTING_MENU_OPTION_RANGE	0
 #define SETTING_MENU_OPTION_TYPE	1
 #define SETTING_MENU_OPTION_OPENNOW	2
-#define SETTING_MENU_TEXT_LENGTH	64
-#define SETTING_MENU_SUB_TEXT_LENGTH	64
 #define SETTING_MENU_HEADER_HEIGHT	18
 
 #define WAIT_ANIMATION_TIMER_DELTA	33
@@ -35,13 +26,13 @@
 #define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
 #define WAIT_TEXT_LAYER_HEIGHT		32
 
-#define PERSIST_KEY_USER_SETTING	40
-
-// XXX: If changed the following status code, the js file might need to be updated
+// If changed the following status code, the js file might need to be updated
+// Also need to check corresponding const error message strings
 #define QUERY_STATUS_SUCCESS		0
 #define QUERY_STATUS_NO_RESULT		1
 #define QUERY_STATUS_GPS_TIMEOUT	2
 #define QUERY_STATUS_GOOGLE_API_ERROR	3
+
 #define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
 #define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
 #define QUERY_TYPE_INVALID		2
@@ -57,6 +48,9 @@
 #define DEFAULT_SEARCH_TYPE		1	// Restaurant
 #define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
 
+// Key for persist storage
+#define PERSIST_KEY_USER_SETTING	40
+
 // Key for appmessage
 #define KEY_STATUS			0
 #define KEY_QUERY_TYPE			1	
@@ -69,7 +63,7 @@
 #define KEY_DETAIL_ADDRESS		20	// detail information returned by 'detail' query
 #define KEY_DETAIL_PHONE		21
 #define KEY_DETAIL_RATING		22
-#define KEY_LIST_FIRST			30	// First restaurant information data (returned by 'list' query)
+#define KEY_LIST_FIRST			30	// Note: Must sync with js file manually. Key of the first restaurant information data
 
 // --------------------------------------------------------------------------------------
 // XXX: Data Structure Defination
@@ -117,20 +111,19 @@ const char *list_menu_header_text = "Restaurants";
 const char *setting_main_menu_header_text = "Options";
 const char *wait_layer_header_text = "Searching...";
 
-// XXX: must match QUERY_STATUS_xxx index
 const char query_status_error_message[][256] = {"", "No Result", "GPS Timeout", "API Error"};
 const char query_status_error_sub_message[][256] = {"", "Please try other search options", "Please try again later", ""};
 
 const char unknown_error_message[256] = "Unknown error";
 const char unknown_error_sub_message[256] = "Please bring the following message to the author:";
 
-const char setting_main_menu_text[][SETTING_MENU_TEXT_LENGTH] = {"Range", "Keyword", "Open Now"};
-const char setting_range_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"500 M", "1 KM", "5 KM", "10 KM"};
-const char setting_type_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"Food", "Restaurant", "Cafe", "Bar"};
-const char setting_opennow_option_text[][LIST_MENU_SUB_TEXT_LENGTH] = {"No", "Yes"};
+const char setting_main_menu_text[][32] = {"Range", "Keyword", "Open Now"};
+const char setting_range_option_text[][32] = {"500 M", "1 KM", "5 KM", "10 KM"};
+const char setting_type_option_text[][32] = {"Food", "Restaurant", "Cafe", "Bar"};
+const char setting_opennow_option_text[][32] = {"No", "Yes"};
 
-const char direction_name[][16] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
-const char distance_unit[16] = "meters";
+const char direction_name[][32] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
+const char distance_unit[32] = "meters";
 
 // --------------------------------------------------------------------------------------
 // XXX: The global variables
@@ -378,7 +371,7 @@ static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer
 static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[cell_index->row]);
 	char *text = ptr->name;
-	char sub_text[256];
+	char sub_text[32];
 
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
