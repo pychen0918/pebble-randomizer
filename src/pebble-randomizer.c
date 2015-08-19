@@ -386,7 +386,6 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 	menu_cell_basic_header_draw(ctx, cell_layer, setting_type_option_text[s_user_setting.type]);
 }
 
-// TODO: add detail window
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
 	// index is the "real index" that map to actual restaurant data
 	// we need to map cell_index back to real index to acquire real detail data
@@ -464,7 +463,25 @@ static void list_window_push(void){
 	window_stack_push(s_list_window, true);
 }
 
-// TODO: Register button press for detail
+static void result_select_click_handler(ClickRecognizerRef recognizer, void *context) {
+	s_menu_state.user_detail_index = s_search_result.random_result;
+	s_menu_state.user_operation = USER_OPERATION_DETAIL;
+
+	// Check if we have detail information already
+	if(s_search_result.restaurant_info[s_menu_state.user_detail_index].address != NULL){
+		// show detail window
+		detail_window_push();
+	}
+	else{
+		send_detail_query((uint8_t)(s_menu_state.user_detail_index));
+		wait_window_push();
+	}
+}
+
+static void result_click_config_provider(void *context){
+	window_single_click_subscribe(BUTTON_ID_SELECT, (ClickHandler)result_select_click_handler);
+}
+
 static void result_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
@@ -476,6 +493,8 @@ static void result_window_load(Window *window) {
 	status = s_search_result.query_status;
 	switch(status){
 		case QUERY_STATUS_SUCCESS:
+			// Register click function
+			window_set_click_config_provider(window, (ClickConfigProvider) result_click_config_provider); 
 			// Randomly pick up the restaurant
 			s_search_result.random_result = rand()%s_search_result.num_of_restaurant;
 			// Collect required fields
@@ -827,23 +846,23 @@ static void detail_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 	static char text[256];
-	char rating_str[8];
+	char rating_str[16];
 	int index = s_menu_state.user_detail_index;
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
 
 	if(ptr->rating<=5)
-		snprintf(rating_str, sizeof(rating_str), "%d", (int)(ptr->rating));
+		snprintf(rating_str, sizeof(rating_str), "%d stars", (int)(ptr->rating));
 	else
 		strncpy(rating_str, "No data", sizeof(rating_str));
 
-	snprintf(text, sizeof(text), "Address: %s\nPhone Number: %s\nRating: %s stars", 
+	snprintf(text, sizeof(text), "Address:\n%s\nPhone Number:\n%s\nRating:\n%s", 
 		(ptr->address!=NULL)?ptr->address:"No data",
 		(ptr->phone!=NULL)?ptr->phone:"No data",
 		rating_str);
 
-	s_detail_text_layer = text_layer_create(bounds);
+	s_detail_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h+50));
 	text_layer_set_font(s_detail_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_detail_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_detail_text_layer, GColorClear);
@@ -1009,7 +1028,6 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 	return ret;
 }
 
-// TODO: sort list result by distance
 static void inbox_received_callback(DictionaryIterator *iterator, void *context){
 	Tuple *t = dict_read_first(iterator);
 	int parse_result = DATA_INVALID;
