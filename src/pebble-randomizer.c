@@ -102,6 +102,7 @@ typedef struct __user_setting_t{
 typedef struct __menu_status_t{
 	uint8_t user_operation;		 	// which function is currently performed by user (Random, List, Setting, Detail)
 	uint8_t setting_menu_selected_option; 	// which setting menu is selected by user (Range, Keyword, Open Now)
+	uint8_t user_detail_index;		// which restraunt user is looking for details
 } MenuState;
 
 // --------------------------------------------------------------------------------------
@@ -387,17 +388,21 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 
 // TODO: add detail window
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+	// index is the "real index" that map to actual restaurant data
+	// we need to map cell_index back to real index to acquire real detail data
 	int index = s_search_result.sorted_index[cell_index->row];
+
+	s_menu_state.user_operation = USER_OPERATION_DETAIL;
+	s_menu_state.user_detail_index = index;
 
 	// Check if we have detail information already
 	if(s_search_result.restaurant_info[index].address != NULL){
 		// show detail window
-		// detail_window_push();
+		detail_window_push();
 	}
 	else{
-		// send_detail_query((uint8_t)index);
-		// s_menu_state.user_operation = USER_OPERATION_DETAIL;
-		// push_wait_window();
+		send_detail_query((uint8_t)index);
+		wait_window_push();
 	}
 }
 
@@ -821,16 +826,29 @@ static void wait_window_push(void){
 static void detail_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
+	static char text[256];
+	char rating_str[8];
+	int index = s_menu_state.user_detail_index;
+	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
+
+	if(ptr->rating<=5)
+		snprintf(rating_str, sizeof(rating_str), "%d", (int)(ptr->rating));
+	else
+		strncpy(rating_str, "No data", sizeof(rating_str));
+
+	snprintf(text, sizeof(text), "Address: %s\nPhone Number: %s\nRating: %s stars", 
+		(ptr->address!=NULL)?ptr->address:"No data",
+		(ptr->phone!=NULL)?ptr->phone:"No data",
+		rating_str);
 
 	s_detail_text_layer = text_layer_create(bounds);
 	text_layer_set_font(s_detail_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_detail_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_detail_text_layer, GColorClear);
 	text_layer_set_text_color(s_detail_text_layer, GColorBlack);
-	// TODO: Add detail
-	text_layer_set_text(s_detail_text_layer, "Detail...");
+	text_layer_set_text(s_detail_text_layer, text);
 	layer_add_child(window_layer, text_layer_get_layer(s_detail_text_layer));
 }
 
@@ -945,29 +963,32 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_detail_message_handler");
 
-	switch(t->key){
-		case KEY_STATUS:
-			s_search_result.query_status = t->value->uint8;
-			break;
-		case KEY_QUERY_ERROR_MESSAGE:
-			strncpy(errmsg, t->value->cstring, sizeof(errmsg));
-			break;
-		case KEY_QUERY_PLACE_ID:
-			// user might send multiple detail queries in once. Use the returned place_id as the key
-			index = find_index_from_place_id(t->value->cstring);
-			break;
-		case KEY_DETAIL_ADDRESS:
-			strncpy(buf[0], t->value->cstring, sizeof(buf[0]));
-			break;
-		case KEY_DETAIL_PHONE:
-			strncpy(buf[1], t->value->cstring, sizeof(buf[1]));
-			break;
-		case KEY_DETAIL_RATING:
-			rating = t->value->uint8;
-			break;
-		default:
-			APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);
-			break;
+	while(t!=NULL){
+		switch(t->key){
+			case KEY_STATUS:
+				s_search_result.query_status = t->value->uint8;
+				break;
+			case KEY_QUERY_ERROR_MESSAGE:
+				strncpy(errmsg, t->value->cstring, sizeof(errmsg));
+				break;
+			case KEY_QUERY_PLACE_ID:
+				// user might send multiple detail queries in once. Use the returned place_id as the key
+				index = find_index_from_place_id(t->value->cstring);
+				break;
+			case KEY_DETAIL_ADDRESS:
+				strncpy(buf[0], t->value->cstring, sizeof(buf[0]));
+				break;
+			case KEY_DETAIL_PHONE:
+				strncpy(buf[1], t->value->cstring, sizeof(buf[1]));
+				break;
+			case KEY_DETAIL_RATING:
+				rating = t->value->uint8;
+				break;
+			default:
+				APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);
+				break;
+		}
+		t = dict_read_next(iterator);
 	}
 
 	// if we failed to find corresponding restaurant, consider this query returns no result
@@ -1042,10 +1063,10 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 			}
 			else if(s_menu_state.user_operation == USER_OPERATION_DETAIL){
 				// if the result is invalid, still display result window with error message
-				//if(parse_result != DATA_VALID)
-				//	result_window_push();
-				//else
-				//	detail_window_push();
+				if(parse_result != DATA_VALID)
+					result_window_push();
+				else
+					detail_window_push();
 			}
 			window_stack_remove(s_wait_window, false);
 		}
@@ -1095,6 +1116,7 @@ static void init(){
 	}
 	s_menu_state.user_operation = USER_OPERATION_RANDOM;
 	s_menu_state.setting_menu_selected_option = SETTING_MENU_OPTION_RANGE;
+	s_menu_state.user_detail_index = 0;
 
 	// Create main window
 	s_main_window = window_create();

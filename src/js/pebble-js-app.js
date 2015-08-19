@@ -132,11 +132,21 @@ function locationSuccess(pos){
 							dictionary['status'] = status_code['success'];
 					}
 					else if(g_query_type == 1){ // detail
+						var rating;
 						dictionary['detail_phone'] = json.result.formatted_phone_number;
 						dictionary['query_place_id'] = json.result.place_id;
-						dictionary['detail_rating'] = Math.round(json.result.rating);
+						rating = Math.round(json.result.rating);
+						if(isNaN(rating))
+							dictionary['detail_rating'] = 255;
+						else
+							dictionary['detail_rating'] = Math.round(json.result.rating);
 						dictionary['detail_address'] = json.result.vicinity;
 						dictionary['status'] = status_code['success'];
+						console.log("name: "+json.result.name + 
+							" phone: "+dictionary['detail_phone'] +
+							" place_id:"+dictionary['query_place_id']+
+							" rating: "+dictionary['detail_rating']+
+							" address: "+dictionary['detail_address']);
 					}
 				}
 			} 
