@@ -50,17 +50,6 @@ function getDirection(lat1, lon1, lat2, lon2) {
 }
 
 function locationSuccess(pos){
-/*
-	console.log("Location success:" + 
-		" lat=" + pos.coords.latitude +
-		' lon=' + pos.coords.longitude +
-		" alt=" + pos.coords.altitude +
-		" posaccu=" + pos.coords.accuracy + 
-		" altaccu=" + pos.coords.altitudeAccuracy +
-		" head=" + pos.coords.heading +
-		" speed=" + pos.coords.speed
-		);
-*/
 	var url;
 	if(g_query_type == 0){  // list
 		url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
@@ -78,6 +67,7 @@ function locationSuccess(pos){
 	else {
 		console.log("Unknown query type: " + g_query_type + "!");
 		// in this case, we send list query
+		g_query_type = 0;
 		url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
 			"location=" + pos.coords.latitude + "," + pos.coords.longitude +
 			"&radius=" + g_range_text[g_option_range] + 
@@ -97,52 +87,69 @@ function locationSuccess(pos){
 			
 			try{
 				json = JSON.parse(responseText);
-				// early error handling
-				if(json.status != 'OK' ){
-					dictionary['status'] = status_code['api_error'];
-					dictionary['error_message'] = json.status + ": " + json.error_message;
-				}
-				else if(g_query_type == 0){ // list
-					dictionary['query_type'] = 0;
-					key = list_first_key;
-					for(i in json.results){
-						console.log("i = " + i);
-						lat = json.results[i].geometry.location.lat;
-						lon = json.results[i].geometry.location.lng;
-						place_id = json.results[i].place_id;
-						distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
-						direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
-						console.log(" key: " + key + 
-							    " name: " + json.results[i].name + 
-							    " direction: " + direction + 
-							    " distance: " + distance +
-							    " place_id: " + place_id);
-						dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + place_id;
-						key++;
-					}
-					if(key == list_first_key)  // didn't get any result
-						dictionary['status'] = status_code['no_result'];
-					else
-						dictionary['status'] = status_code['success'];
-				}
-				else if(g_query_type == 1){ // detail
-					dictionary['query_type'] = 1;
-					dictionary['detail_phone'] = json.result.formatted_phone_number;
-					dictionary['query_place_id'] = json.result.place_id;
-					dictionary['detail_rating'] = Math.round(json.result.rating);
-					dictionary['detail_address'] = json.result.vicinity;
-					dictionary['status'] = status_code['success'];
-				}
-				// always set uid
+
+				// always set these fields
 				dictionary['query_uid'] = g_query_uid;
+				dictionary['query_type'] = g_query_type;
+
+				// Case 1: No result, we can remind user to change search conditions
+				if(json.status == "ZERO_RESULTS"){
+					console.log("[ERROR] status: "+json.status);
+					dictionary['status'] = status_code['no_result'];
+				}
+				// Case 2: Other error, like OVER_QUERY_LIMIT, REQUEST_DENIED or INVALID_REQUEST
+				// We call them "api_error" and add google's response in error_message
+				// This will show to users
+				else if(json.status != 'OK' ){
+					console.log("[ERROR] status: "+json.status);
+					dictionary['status'] = status_code['api_error'];
+					dictionary['query_type'] = g_query_type;
+					dictionary['error_message'] = json.status + " " + json.error_message;
+				}
+				// Case 3: Success, google gave us "OK"
+				// We can parse the data now
+				else{
+					if(g_query_type == 0){ // list
+						key = list_first_key;
+						for(i in json.results){
+							console.log("i = " + i);
+							lat = json.results[i].geometry.location.lat;
+							lon = json.results[i].geometry.location.lng;
+							place_id = json.results[i].place_id;
+							distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
+							direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
+							console.log(" key: " + key + 
+								    " name: " + json.results[i].name + 
+								    " direction: " + direction + 
+								    " distance: " + distance +
+								    " place_id: " + place_id);
+							dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + place_id;
+							key++;
+						}
+						if(key == list_first_key)  // didn't get any result
+							dictionary['status'] = status_code['no_result'];
+						else
+							dictionary['status'] = status_code['success'];
+					}
+					else if(g_query_type == 1){ // detail
+						dictionary['detail_phone'] = json.result.formatted_phone_number;
+						dictionary['query_place_id'] = json.result.place_id;
+						dictionary['detail_rating'] = Math.round(json.result.rating);
+						dictionary['detail_address'] = json.result.vicinity;
+						dictionary['status'] = status_code['success'];
+					}
+				}
 			} 
 			catch(e){
-				console.log("Error while parsing response: ");
+				// Case 4: Any error while parsing returned data
+				// We still call it "api_error" and send message back
+				// This will show to user 
+				console.log("[Error]: " + e.message + "; while parsing response: ");
 				console.log(responseText);
 				dictionary['status'] = status_code['api_error'];
 				dictionary['query_uid'] = g_query_uid;
+				dictionary['query_type'] = g_query_type;
 				dictionary['error_message'] = e.message;
-				console.log('error_message = ' + e.message);
 			}
 
 			// Send to Pebble
