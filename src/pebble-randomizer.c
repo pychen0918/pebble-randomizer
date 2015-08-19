@@ -82,6 +82,7 @@ typedef struct __restaurant_information_t{
 
 typedef struct __search_result_t{
 	RestaurantInformation restaurant_info[SEARCH_RESULT_MAX_DATA_NUMBER];	// The above restaurant information. Up to 20 restaurants.
+	uint8_t sorted_index[SEARCH_RESULT_MAX_DATA_NUMBER];			// The array that stores index of restaurant which sorted by distance
 	time_t last_query_time;			// The epoch time of the last successful query. Use to check if the data is valid or not.
 	uint8_t num_of_restaurant;		// How many restaurants actually found
 	uint8_t query_status;			// Record most recent query status. It is for list query only, not detail.
@@ -370,7 +371,8 @@ static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer
 }
 
 static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
-	RestaurantInformation *ptr = &(s_search_result.restaurant_info[cell_index->row]);
+	int index = s_search_result.sorted_index[cell_index->row];
+	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	char *text = ptr->name;
 	char sub_text[32];
 
@@ -385,9 +387,7 @@ static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer
 
 // TODO: add detail window
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
-	int index = cell_index->row;
-
-	APP_LOG(APP_LOG_LEVEL_INFO, "%d item selected", cell_index->row);
+	int index = s_search_result.sorted_index[cell_index->row];
 
 	// Check if we have detail information already
 	if(s_search_result.restaurant_info[index].address != NULL){
@@ -401,11 +401,32 @@ static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 	}
 }
 
+static void list_menu_sort_by_distance(void){
+// sort the restaurants by distance and store the result in sorted_index array
+	int i, j;
+	uint8_t *a, *b, temp;
+	uint8_t num = s_search_result.num_of_restaurant;
+	RestaurantInformation *ptr = &(s_search_result.restaurant_info[0]);
+
+	for(i=0;i<num;i++){
+		for(j=i+1;j<num;j++){
+			a = &(s_search_result.sorted_index[i]);
+			b = &(s_search_result.sorted_index[j]);
+			if( ptr[*a].distance > ptr[*b].distance){
+				temp = *a;
+				*a = *b;
+				*b = temp; 
+			}
+		}
+	}
+}
+
 static void list_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "List load");
+	list_menu_sort_by_distance();
 
 	s_list_menu_layer = menu_layer_create(bounds);
 	menu_layer_set_callbacks(s_list_menu_layer, NULL, (MenuLayerCallbacks){
@@ -1047,11 +1068,16 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 }
 
 static void init(){
+	int i;
+
 	// Initialize random seed
 	srand(time(NULL));
 
 	// Initialize variables
 	memset(s_search_result.restaurant_info, 0, sizeof(s_search_result.restaurant_info));
+	for(i=0;i<SEARCH_RESULT_MAX_DATA_NUMBER;i++){
+		s_search_result.sorted_index[i] = i;
+	}
 	s_search_result.is_querying = false;
 	s_search_result.last_query_time = 0;
 	s_search_result.num_of_restaurant = 0;
