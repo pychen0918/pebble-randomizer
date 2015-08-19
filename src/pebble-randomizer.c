@@ -1,7 +1,7 @@
 #include <pebble.h>
 
 #define SEARCH_RESULT_MAX_DATA_NUMBER	20	// Max number of returned data
-#define SEARCH_RESULT_AGE_TIMEOUT	60 	// How long the list is valid in seconds
+#define SEARCH_RESULT_AGE_TIMEOUT	300 	// How long the list is valid in seconds
 
 #define MAIN_MENU_ROWS			3	// Random, list and settings
 #define MAIN_MENU_TEXT_LENGTH		64
