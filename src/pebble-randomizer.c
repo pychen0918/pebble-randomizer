@@ -246,7 +246,7 @@ static void *alloc_and_copy_string(char* string){
 	char *ptr;
 	int size = strlen(string)+1;
 	ptr = (char *)malloc(size);
-	strncpy(ptr, string, size-1);
+	strncpy(ptr, string, size);
 	return ptr;
 }
 
