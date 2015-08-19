@@ -107,7 +107,6 @@ typedef struct __menu_status_t{
 // --------------------------------------------------------------------------------------
 
 const char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!", "List", "Settings"};
-const char *list_menu_header_text = "Restaurants";
 const char *setting_main_menu_header_text = "Options";
 const char *wait_layer_header_text = "Searching...";
 
@@ -379,7 +378,7 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	menu_cell_basic_header_draw(ctx, cell_layer, list_menu_header_text);
+	menu_cell_basic_header_draw(ctx, cell_layer, setting_type_option_text[s_user_setting.type]);
 }
 
 // TODO: add detail window
