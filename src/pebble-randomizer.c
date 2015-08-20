@@ -139,6 +139,12 @@ static AppTimer *s_wait_animation_timer;// Timer for waiting animation
 static int s_wait_animation_counter = 0;
 static AppTimer *s_wait_timeout_timer;	// Timer for dismissing waiting window
 
+static GBitmap *s_icon_blank_bitmap;	// The blank icon for settings
+static GBitmap *s_icon_check_black_bitmap;	// The black check icon for settings
+#ifdef PBL_PLATFORM_BASALT
+static GBitmap *s_icon_check_white_bitmap;	// The white check icon for settings, while being highlighted
+#endif
+
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
 static MenuLayer *s_main_menu_layer;
@@ -606,7 +612,12 @@ static void setting_window_load(Window *window){
 	GRect bounds = layer_get_bounds(window_layer);
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Settings load");
-	
+
+	s_icon_blank_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_BLANK);
+	s_icon_check_black_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_BLACK);
+#ifdef PBL_PLATFORM_BASALT
+	s_icon_check_white_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_WHITE);
+#endif
 	s_setting_main_menu_layer = menu_layer_create(bounds);
 	menu_layer_set_callbacks(s_setting_main_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = setting_main_menu_get_num_rows_callback,
@@ -620,8 +631,12 @@ static void setting_window_load(Window *window){
 }
 
 static void setting_window_unload(Window *window){
+	gbitmap_destroy(s_icon_blank_bitmap);
+	gbitmap_destroy(s_icon_check_black_bitmap);
+#ifdef PBL_PLATFORM_BASALT
+	gbitmap_destroy(s_icon_check_white_bitmap);
+#endif
 	menu_layer_destroy(s_setting_main_menu_layer);
-
 	window_destroy(window);
 	s_setting_window = NULL;
 }
@@ -656,10 +671,8 @@ static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulay
 	return ret;
 }
 
-// TODO: Add marker icon
 static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	const char *text = NULL;
-	const char *sub_text = "Marked";
 	uint8_t selected_index = 0;  // the one that is selected previously by user
 
 	switch(s_menu_state.setting_menu_selected_option){
@@ -679,10 +692,22 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 			break;
 	}
 
-	if(cell_index->row == selected_index)
-		menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
+	if(cell_index->row == selected_index){
+#ifdef PBL_PLATFORM_BASALT
+		if(menu_cell_layer_is_highlighted(cell_layer)){
+			// in Basalt platform, we need to use white icon when highlighted
+			menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_white_bitmap);
+		}
+		else{
+			menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_black_bitmap);
+		}
+#else
+		// in Aplite platform, we simply use black black icon as the OS will invert it if highlighted
+		menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_black_bitmap);
+#endif
+	}
 	else
-		menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
+		menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_blank_bitmap);
 }
 
 static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
