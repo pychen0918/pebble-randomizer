@@ -124,6 +124,12 @@ const char setting_range_option_text[][32] = {"500 M", "1 KM", "5 KM", "10 KM"};
 const char setting_type_option_text[][32] = {"Food", "Restaurant", "Cafe", "Bar"};
 const char setting_opennow_option_text[][32] = {"No", "Yes"};
 
+const char detail_address_text[16] = "Address: ";
+const char detail_phone_text[16] = "Tel: ";
+const char detail_rating_text[16] = "Rating: ";
+const char detail_nodata_text[16] = "No data";
+const char detail_star_text[16] = "stars";
+
 const char direction_name[][32] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
 const char distance_unit[32] = "meters";
 
@@ -877,14 +883,14 @@ static void detail_window_load(Window *window) {
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
 
-	if(ptr->rating<=5)
-		snprintf(rating_str, sizeof(rating_str), "%d stars", (int)(ptr->rating));
+	if(ptr->rating<=5 && ptr->rating>0)
+		snprintf(rating_str, sizeof(rating_str), "%s%d %s", detail_rating_text, (int)(ptr->rating), detail_star_text);
 	else
-		strncpy(rating_str, "No data", sizeof(rating_str));
+		snprintf(rating_str, sizeof(rating_str), "%s%s", detail_rating_text, detail_nodata_text);
 
-	snprintf(text, sizeof(text), "Address:\n%s\nPhone Number:\n%s\nRating:\n%s", 
-		(ptr->address!=NULL)?ptr->address:"No data",
-		(ptr->phone!=NULL)?ptr->phone:"No data",
+	snprintf(text, sizeof(text), "%s%s\n%s%s\n%s",
+		detail_address_text, (ptr->address!=NULL && strlen(ptr->address)>0)?ptr->address:detail_nodata_text,
+		detail_phone_text, (ptr->phone!=NULL && strlen(ptr->phone)>0)?ptr->phone:detail_nodata_text,
 		rating_str);
 
 	s_detail_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h+50));

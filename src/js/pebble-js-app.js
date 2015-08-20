@@ -132,15 +132,25 @@ function locationSuccess(pos){
 							dictionary['status'] = status_code['success'];
 					}
 					else if(g_query_type == 1){ // detail
-						var rating;
-						dictionary['detail_phone'] = json.result.formatted_phone_number;
+						var phone, address, rating;
 						dictionary['query_place_id'] = json.result.place_id;
+						phone = json.result.formatted_phone_number;
+						address = json.result.vicinity;
 						rating = Math.round(json.result.rating);
+
 						if(isNaN(rating))
-							dictionary['detail_rating'] = 255;
+							dictionary['detail_rating'] = 0;
 						else
 							dictionary['detail_rating'] = Math.round(json.result.rating);
-						dictionary['detail_address'] = json.result.vicinity;
+						if(typeof(address) == 'undefined')
+							dictionary['detail_address'] = "";
+						else
+							dictionary['detail_address'] = address;
+						if(typeof(phone) == 'undefined')
+							dictionary['detail_phone'] = "";
+						else
+							dictionary['detail_phone'] = phone;
+
 						dictionary['status'] = status_code['success'];
 						console.log("name: "+json.result.name + 
 							" phone: "+dictionary['detail_phone'] +
