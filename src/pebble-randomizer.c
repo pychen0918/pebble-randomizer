@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "localize.h"
 
 #define SEARCH_RESULT_MAX_DATA_NUMBER	20	// Max number of returned data
 #define SEARCH_RESULT_AGE_TIMEOUT	300 	// How long the list is valid in seconds
@@ -33,6 +34,7 @@
 #define QUERY_STATUS_NO_RESULT		1
 #define QUERY_STATUS_GPS_TIMEOUT	2
 #define QUERY_STATUS_GOOGLE_API_ERROR	3
+#define QUERY_STATUS_NUM_OF_ERROR_TYPES 4
 
 #define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
 #define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
@@ -109,29 +111,29 @@ typedef struct __menu_status_t{
 // XXX: The constant strings
 // --------------------------------------------------------------------------------------
 
-const char main_menu_text[MAIN_MENU_ROWS][MAIN_MENU_TEXT_LENGTH] = {"Random!", "List", "Settings"};
-const char *setting_main_menu_header_text = "Options";
-const char *wait_layer_header_text = "Searching...";
+const char *main_menu_text[MAIN_MENU_ROWS];
+const char *setting_main_menu_header_text;
+const char *wait_layer_header_text;
 
-const char query_status_error_message[][256] = {"", "No Result", "GPS Timeout", "API Error"};
-const char query_status_error_sub_message[][256] = {"", "Please try other search options", "Please try again later", ""};
+const char *query_status_error_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
+const char *query_status_error_sub_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
 
-const char unknown_error_message[256] = "Unknown error";
-const char unknown_error_sub_message[256] = "Please bring the following message to the author:";
+const char *unknown_error_message;
+const char *unknown_error_sub_message;
 
-const char setting_main_menu_text[][32] = {"Range", "Keyword", "Open Now"};
-const char setting_range_option_text[][32] = {"500 M", "1 KM", "5 KM", "10 KM"};
-const char setting_type_option_text[][32] = {"Food", "Restaurant", "Cafe", "Bar"};
-const char setting_opennow_option_text[][32] = {"No", "Yes"};
+const char *setting_main_menu_text[3];		// random, list, setting
+const char *setting_range_option_text[4];	// 500 M, 1 KM, 5 KM, 10 KM
+const char *setting_type_option_text[4];	// Food, Restaurant, Cafe, Bar
+const char *setting_opennow_option_text[2];	// No, Yes
 
-const char detail_address_text[16] = "Address: ";
-const char detail_phone_text[16] = "Tel: ";
-const char detail_rating_text[16] = "Rating: ";
-const char detail_nodata_text[16] = "No data";
-const char detail_star_text[16] = "stars";
+const char *detail_address_text;
+const char *detail_phone_text;
+const char *detail_rating_text;
+const char *detail_nodata_text;
+const char *detail_star_text;
 
-const char direction_name[][32] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"};
-const char distance_unit[32] = "meters";
+const char *direction_name[9];			// N, NE, E, ..., NW, N, total 9
+const char *distance_unit;
 
 // --------------------------------------------------------------------------------------
 // XXX: The global variables
@@ -1137,8 +1139,63 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 	s_search_result.is_querying = false;  // reset the flag
 }
 
+static void initialize_const_strings(void){
+	main_menu_text[0] = _("Random!");
+	main_menu_text[1] = _("List");
+	main_menu_text[2] = _("Settings");
+	setting_main_menu_header_text = _("Options");
+	wait_layer_header_text = _("Searching...");
+
+	query_status_error_message[0] = "";
+	query_status_error_message[1] = _("No Result");
+	query_status_error_message[2] = _("GPS Timeout");
+	query_status_error_message[3] = _("API Error");
+	query_status_error_sub_message[0] = "";
+	query_status_error_sub_message[1] = _("Please try other search options");
+	query_status_error_sub_message[2] = _("Please try again later");
+
+	unknown_error_message = _("Unknown error");
+	unknown_error_sub_message = _("Please bring the following message to the author:");
+
+	setting_main_menu_text[0] = _("Range");
+	setting_main_menu_text[1] = _("Keyword");
+	setting_main_menu_text[2] = _("Open Now");
+	setting_range_option_text[0] = _("500 M");
+	setting_range_option_text[1] = _("1 KM");
+	setting_range_option_text[2] = _("5 KM");
+	setting_range_option_text[3] = _("10 KM");
+	setting_type_option_text[0] = _("Food");
+	setting_type_option_text[1] = _("Restaurant");
+	setting_type_option_text[2] = _("Cafe");
+	setting_type_option_text[3] = _("Bar");
+	setting_opennow_option_text[0] = _("No");
+	setting_opennow_option_text[1] = _("Yes");
+
+	detail_address_text = _("Address: ");
+	detail_phone_text = _("Tel: ");
+	detail_rating_text = _("Rating: ");
+	detail_nodata_text = _("No data");
+	detail_star_text = _("stars");
+
+	direction_name[0] = _("N");
+	direction_name[1] = _("NE");
+	direction_name[2] = _("E");
+	direction_name[3] = _("SE");
+	direction_name[4] = _("S");
+	direction_name[5] = _("SW");
+	direction_name[6] = _("W");
+	direction_name[7] = _("NW");
+	direction_name[8] = _("N");
+	distance_unit = _("meters");
+}
+
 static void init(){
 	int i;
+
+	// Initialize locale framework
+	locale_init();
+
+	initialize_const_strings();
 
 	// Initialize random seed
 	srand(time(NULL));

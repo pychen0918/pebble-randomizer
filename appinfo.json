@@ -44,6 +44,21 @@
         "targetPlatforms": [
           "basalt"
         ]
+      },
+      {
+        "type": "raw",
+        "name": "LOCALE_ENGLISH",
+        "file": "loc_english.bin"
+      },
+      {
+        "type": "raw",
+        "name": "LOCALE_SIMPLIFIED_CHINESE",
+        "file": "loc_simplified_chinese.bin"
+      },
+      {
+        "type": "raw",
+        "name": "LOCALE_TRADITIONAL_CHINESE",
+        "file": "loc_traditional_chinese.bin"
       }
     ]
   }
