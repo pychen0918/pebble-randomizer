@@ -135,7 +135,7 @@ function locationSuccess(pos){
 						var phone, address, rating;
 						dictionary['query_place_id'] = json.result.place_id;
 						phone = json.result.formatted_phone_number;
-						address = json.result.vicinity;
+						address = json.result.formatted_address;
 						rating = Math.round(json.result.rating);
 
 						if(isNaN(rating))
