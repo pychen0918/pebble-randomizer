@@ -34,7 +34,8 @@
 #define QUERY_STATUS_NO_RESULT		1
 #define QUERY_STATUS_GPS_TIMEOUT	2
 #define QUERY_STATUS_GOOGLE_API_ERROR	3
-#define QUERY_STATUS_NUM_OF_ERROR_TYPES 4
+#define QUERY_STATUS_NO_DETAIL		4
+#define QUERY_STATUS_NUM_OF_ERROR_TYPES 5
 
 #define QUERY_TYPE_LIST			0	// ask for the information 20 nearby store
 #define QUERY_TYPE_DETAIL		1	// ask for the information of one certain store
@@ -152,6 +153,7 @@ static GBitmap *s_icon_check_black_bitmap;	// The black check icon for settings
 #ifdef PBL_PLATFORM_BASALT
 static GBitmap *s_icon_check_white_bitmap;	// The white check icon for settings, while being highlighted
 #endif
+static GBitmap *s_icon_agenda_bitmap;	// The icon for action bar
 
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
@@ -161,6 +163,7 @@ static MenuLayer *s_main_menu_layer;
 static Window *s_result_window;
 static TextLayer *s_result_title_text_layer;
 static TextLayer *s_result_sub_text_layer;
+static ActionBarLayer *s_result_action_bar_layer;
 
 // The list menu for all candidate
 static Window *s_list_window;
@@ -502,13 +505,14 @@ static void result_window_load(Window *window) {
 	static char title_text[256], sub_text[256];
 	RestaurantInformation *ptr;
 	uint8_t status;
+	int text_layer_width;
+	bool create_action_bar = false; // create action bar only when valid result is displayed
 	
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window load");
 	status = s_search_result.query_status;
 	switch(status){
 		case QUERY_STATUS_SUCCESS:
-			// Register click function
-			window_set_click_config_provider(window, (ClickConfigProvider) result_click_config_provider); 
+			create_action_bar = true;
 			// Randomly pick up the restaurant
 			s_search_result.random_result = rand()%s_search_result.num_of_restaurant;
 			// Collect required fields
@@ -533,8 +537,22 @@ static void result_window_load(Window *window) {
 			snprintf(sub_text, sizeof(sub_text), "%s %s%d", unknown_error_sub_message, "Incorrect query status:",status);
 			break;
 	}
+	
+	// action bar part
+	if(create_action_bar == true){
+		s_icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
+		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH - 3;
+		s_result_action_bar_layer = action_bar_layer_create();
+		action_bar_layer_add_to_window(s_result_action_bar_layer, window);
+		action_bar_layer_set_click_config_provider(s_result_action_bar_layer, (ClickConfigProvider)result_click_config_provider);
+
+		action_bar_layer_set_icon(s_result_action_bar_layer, BUTTON_ID_SELECT, s_icon_agenda_bitmap);
+	}
+	else{
+		text_layer_width = bounds.size.w;
+	}
 	// title part
-	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, (bounds.size.h/2)));
+	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, (bounds.size.h/2)));
 	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
 	text_layer_set_text_alignment(s_result_title_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_title_text_layer, GColorClear);
@@ -542,7 +560,7 @@ static void result_window_load(Window *window) {
 	text_layer_set_text(s_result_title_text_layer, title_text);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_title_text_layer));
 	// sub title part
-	s_result_sub_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y+(bounds.size.h/2), bounds.size.w, (bounds.size.h/2)));
+	s_result_sub_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y+(bounds.size.h/2), text_layer_width, (bounds.size.h/2)));
 	text_layer_set_font(s_result_sub_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_result_sub_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_sub_text_layer, GColorClear);
@@ -1043,9 +1061,9 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 		t = dict_read_next(iterator);
 	}
 
-	// if we failed to find corresponding restaurant, consider this query returns no result
+	// if we failed to find corresponding restaurant, show detail query fail message
 	if(index < 0){
-		s_search_result.query_status = QUERY_STATUS_NO_RESULT;
+		s_search_result.query_status = QUERY_STATUS_NO_DETAIL;
 	}
 
 	// Store the information if everything is OK
@@ -1150,9 +1168,12 @@ static void initialize_const_strings(void){
 	query_status_error_message[1] = _("No Result");
 	query_status_error_message[2] = _("GPS Timeout");
 	query_status_error_message[3] = _("API Error");
+	query_status_error_message[4] = _("No Detailed Information");
 	query_status_error_sub_message[0] = "";
 	query_status_error_sub_message[1] = _("Please try other search options");
 	query_status_error_sub_message[2] = _("Please try again later");
+	query_status_error_sub_message[3] = "";
+	query_status_error_sub_message[4] = _("Cannot find more information about this restraunt");
 
 	unknown_error_message = _("Unknown error");
 	unknown_error_sub_message = _("Please bring the following message to the author:");

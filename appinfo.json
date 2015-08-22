@@ -46,6 +46,11 @@
         ]
       },
       {
+        "type":"png",
+        "name":"ICON_AGENDA",
+        "file":"images/icon_agenda.png"
+      },
+      {
         "type": "raw",
         "name": "LOCALE_ENGLISH",
         "file": "loc_english.bin"
