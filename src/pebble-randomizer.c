@@ -13,12 +13,12 @@
 #define USER_OPERATION_SETTING		2
 #define USER_OPERATION_DETAIL		3
 
-#define LIST_MENU_HEADER_HEIGHT 	18
+#define LIST_MENU_HEADER_HEIGHT 	22
 
 #define SETTING_MENU_OPTION_RANGE	0
 #define SETTING_MENU_OPTION_TYPE	1
 #define SETTING_MENU_OPTION_OPENNOW	2
-#define SETTING_MENU_HEADER_HEIGHT	18
+#define SETTING_MENU_HEADER_HEIGHT	22
 
 #define WAIT_ANIMATION_TIMER_DELTA	33
 #define WAIT_ANIMATION_BAR_LEFT_MARGIN	10
@@ -429,7 +429,8 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	menu_cell_basic_header_draw(ctx, cell_layer, setting_type_option_text[s_user_setting.type]);
+	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
@@ -633,7 +634,8 @@ static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_
 }
 
 static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	menu_cell_basic_header_draw(ctx, cell_layer, setting_main_menu_header_text);
+	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
 static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
