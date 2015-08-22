@@ -182,6 +182,7 @@ static Layer *s_wait_layer;
 
 // The detail window
 static Window *s_detail_window;
+static ScrollLayer *s_detail_scroll_layer;
 static TextLayer *s_detail_text_layer;
 
 // --------------------------------------------------------------------------------------
@@ -899,6 +900,7 @@ static void detail_window_load(Window *window) {
 	static char text[256];
 	char rating_str[16];
 	int index = s_menu_state.user_detail_index;
+	GSize max_size;
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	
 	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
@@ -908,21 +910,33 @@ static void detail_window_load(Window *window) {
 	else
 		snprintf(rating_str, sizeof(rating_str), "%s%s", detail_rating_text, detail_nodata_text);
 
-	snprintf(text, sizeof(text), "%s%s\n%s%s\n%s",
+	snprintf(text, sizeof(text), "%s\n%s\n%s\n%s\n%s",
 		detail_address_text, (ptr->address!=NULL && strlen(ptr->address)>0)?ptr->address:detail_nodata_text,
 		detail_phone_text, (ptr->phone!=NULL && strlen(ptr->phone)>0)?ptr->phone:detail_nodata_text,
 		rating_str);
 
-	s_detail_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h+50));
+	// setup scroll layer
+	s_detail_scroll_layer = scroll_layer_create(bounds);
+	scroll_layer_set_click_config_onto_window(s_detail_scroll_layer, window);
+	// setup text layer
+	s_detail_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, 2000));  // increase size
 	text_layer_set_font(s_detail_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_detail_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_detail_text_layer, GColorClear);
 	text_layer_set_text_color(s_detail_text_layer, GColorBlack);
 	text_layer_set_text(s_detail_text_layer, text);
-	layer_add_child(window_layer, text_layer_get_layer(s_detail_text_layer));
+	max_size = text_layer_get_content_size(s_detail_text_layer);
+	max_size.h += 10;  // increase height for Chinese fonts
+	text_layer_set_size(s_detail_text_layer, max_size);
+	scroll_layer_set_content_size(s_detail_scroll_layer, GSize(bounds.size.w, max_size.h + 10));
+	scroll_layer_add_child(s_detail_scroll_layer, text_layer_get_layer(s_detail_text_layer));
+
+	// only need to add scroll layer
+	layer_add_child(window_layer, scroll_layer_get_layer(s_detail_scroll_layer));
 }
 
 static void detail_window_unload(Window *window) {
+	scroll_layer_destroy(s_detail_scroll_layer);
 	text_layer_destroy(s_detail_text_layer);
 
 	window_destroy(window);
