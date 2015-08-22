@@ -310,6 +310,34 @@ static void free_search_result(void){
 	}
 }
 
+static void reset_sorted_index(void){
+	int i;
+	for(i=0;i<SEARCH_RESULT_MAX_DATA_NUMBER;i++){
+		s_search_result.sorted_index[i] = i;
+	}
+}
+
+static void list_menu_sort_by_distance(void){
+// sort the restaurants by distance and store the result in sorted_index array
+	int i, j;
+	uint8_t *a, *b, temp;
+	uint8_t num = s_search_result.num_of_restaurant;
+	RestaurantInformation *ptr = &(s_search_result.restaurant_info[0]);
+
+	reset_sorted_index();
+	for(i=0;i<num;i++){
+		for(j=i+1;j<num;j++){
+			a = &(s_search_result.sorted_index[i]);
+			b = &(s_search_result.sorted_index[j]);
+			if( ptr[*a].distance > ptr[*b].distance){
+				temp = *a;
+				*a = *b;
+				*b = temp; 
+			}
+		}
+	}
+}
+
 static uint16_t main_menu_get_num_rows_callback(struct MenuLayer *menulayer, uint16_t section_index, void *callback_context){
 	return MAIN_MENU_ROWS;
 }
@@ -420,26 +448,6 @@ static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 	else{
 		send_detail_query((uint8_t)index);
 		wait_window_push();
-	}
-}
-
-static void list_menu_sort_by_distance(void){
-// sort the restaurants by distance and store the result in sorted_index array
-	int i, j;
-	uint8_t *a, *b, temp;
-	uint8_t num = s_search_result.num_of_restaurant;
-	RestaurantInformation *ptr = &(s_search_result.restaurant_info[0]);
-
-	for(i=0;i<num;i++){
-		for(j=i+1;j<num;j++){
-			a = &(s_search_result.sorted_index[i]);
-			b = &(s_search_result.sorted_index[j]);
-			if( ptr[*a].distance > ptr[*b].distance){
-				temp = *a;
-				*a = *b;
-				*b = temp; 
-			}
-		}
 	}
 }
 
@@ -1225,8 +1233,6 @@ static void initialize_const_strings(void){
 }
 
 static void init(){
-	int i;
-
 	// Initialize locale framework
 	locale_init();
 
@@ -1237,9 +1243,7 @@ static void init(){
 
 	// Initialize variables
 	memset(s_search_result.restaurant_info, 0, sizeof(s_search_result.restaurant_info));
-	for(i=0;i<SEARCH_RESULT_MAX_DATA_NUMBER;i++){
-		s_search_result.sorted_index[i] = i;
-	}
+	reset_sorted_index();
 	s_search_result.is_querying = false;
 	s_search_result.last_query_time = 0;
 	s_search_result.num_of_restaurant = 0;
