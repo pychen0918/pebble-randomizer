@@ -444,7 +444,6 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Index %d is highlighted", cell_index->row);
 	graphics_context_set_text_color(ctx, GColorBlack);
 	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
 		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
