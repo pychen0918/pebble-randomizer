@@ -446,7 +446,7 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 #ifdef PBL_PLATFORM_BASALT
 	if(menu_cell_layer_is_highlighted(cell_layer))
-		graphics_context_set_text_color(ctx, GColorClear);
+		graphics_context_set_text_color(ctx, GColorWhite);
 	else
 		graphics_context_set_text_color(ctx, GColorBlack);
 #else
