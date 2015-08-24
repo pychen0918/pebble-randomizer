@@ -9,6 +9,7 @@ var g_range_text = ["500","1000","5000","10000"];
 var g_type_text = ["food", "restaurant", "cafe", "bar"];
 var g_opennow_text = ["", "&opennow"];
 
+// This key has been revoked. Use the true API key for test.
 var api_key = "AIzaSyDIRnvHHyGijXLZPAP9VZKb15EkB6oPI9s";
 
 // Query status code that need to send back to pebble
