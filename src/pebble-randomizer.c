@@ -444,7 +444,14 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
+#ifdef PBL_PLATFORM_BASALT
+	if(menu_cell_layer_is_highlighted(cell_layer))
+		graphics_context_set_text_color(ctx, GColorClear);
+	else
+		graphics_context_set_text_color(ctx, GColorBlack);
+#else
 	graphics_context_set_text_color(ctx, GColorBlack);
+#endif
 	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
 		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
 		GTextOverflowModeWordWrap, GTextAlignmentLeft, NULL);
