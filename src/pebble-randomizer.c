@@ -941,8 +941,8 @@ static void wait_window_push(void){
 static void detail_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-	static char text[256];
-	char rating_str[16];
+	static char text[512];
+	char rating_str[32];
 	int index = s_menu_state.user_detail_index;
 	GSize max_size;
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
