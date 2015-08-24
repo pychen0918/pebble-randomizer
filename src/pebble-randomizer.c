@@ -417,20 +417,47 @@ static int16_t list_menu_get_header_height_callback(struct MenuLayer *menu_layer
 	return LIST_MENU_HEADER_HEIGHT;
 }
 
+static int16_t list_menu_get_cell_height_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
+	char *text;
+	TextLayer *temp;
+	GRect bounds;
+	GSize content_size;
+
+	text = s_search_result.restaurant_info[s_search_result.sorted_index[cell_index->row]].name;
+	bounds = layer_get_bounds(menu_layer_get_layer(menu_layer));
+	temp = text_layer_create(GRect(bounds.origin.x+5, bounds.origin.y, bounds.size.w-5, bounds.size.h));
+	text_layer_set_font(temp, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+	text_layer_set_overflow_mode(temp, GTextOverflowModeWordWrap);
+	text_layer_set_text(temp, text);
+	content_size = text_layer_get_content_size(temp);
+	text_layer_destroy(temp);
+
+	return content_size.h + 24;
+}
+
 static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, MenuIndex *cell_index, void *callback_context){
 	int index = s_search_result.sorted_index[cell_index->row];
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	char *text = ptr->name;
 	char sub_text[32];
+	GRect bounds = layer_get_bounds(cell_layer);
 
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
-	menu_cell_basic_draw(ctx, cell_layer, text, sub_text, NULL);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Index %d is highlighted", cell_index->row);
+	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
+		GTextOverflowModeWordWrap, GTextAlignmentLeft, NULL);
+	graphics_draw_text(ctx, sub_text, fonts_get_system_font(FONT_KEY_GOTHIC_18),
+		GRect(bounds.origin.x+5, bounds.origin.y + bounds.size.h - 22, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill, GTextAlignmentLeft, NULL);
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
 	graphics_context_set_text_color(ctx, GColorBlack);
-	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
+	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18), 
+		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
@@ -462,6 +489,7 @@ static void list_window_load(Window *window) {
 	s_list_menu_layer = menu_layer_create(bounds);
 	menu_layer_set_callbacks(s_list_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = list_menu_get_num_rows_callback,
+		.get_cell_height = list_menu_get_cell_height_callback,
 		.draw_row = list_menu_draw_row_handler,
 		.select_click = list_menu_select_callback,
 		.get_header_height = list_menu_get_header_height_callback,
