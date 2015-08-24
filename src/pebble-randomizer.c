@@ -551,6 +551,8 @@ static void result_window_load(Window *window) {
 	uint8_t status;
 	int text_layer_width;
 	bool create_action_bar = false; // create action bar only when valid result is displayed
+	GSize max_size;
+	int title_height;
 	
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window load");
 	status = s_search_result.query_status;
@@ -596,15 +598,20 @@ static void result_window_load(Window *window) {
 		text_layer_width = bounds.size.w;
 	}
 	// title part
-	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, (bounds.size.h/2)));
+	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, 2000));
 	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
 	text_layer_set_text_alignment(s_result_title_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_title_text_layer, GColorClear);
 	text_layer_set_text_color(s_result_title_text_layer, GColorBlack);
 	text_layer_set_text(s_result_title_text_layer, title_text);
+	max_size = text_layer_get_content_size(s_result_title_text_layer);
+	if(max_size.h < (bounds.size.h/2))
+		title_height = (bounds.size.h/2);
+	else
+		title_height = max_size.h+10;  // +10 for spacing
 	layer_add_child(window_layer, text_layer_get_layer(s_result_title_text_layer));
 	// sub title part
-	s_result_sub_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y+(bounds.size.h/2), text_layer_width, (bounds.size.h/2)));
+	s_result_sub_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y+title_height, text_layer_width, (bounds.size.h-title_height)));
 	text_layer_set_font(s_result_sub_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_result_sub_text_layer, GTextAlignmentLeft);
 	text_layer_set_background_color(s_result_sub_text_layer, GColorClear);
@@ -618,6 +625,11 @@ static void result_window_unload(Window *window) {
 
 	text_layer_destroy(s_result_title_text_layer);
 	text_layer_destroy(s_result_sub_text_layer);
+	action_bar_layer_destroy(s_result_action_bar_layer);
+	if(s_icon_agenda_bitmap != NULL){
+		gbitmap_destroy(s_icon_agenda_bitmap);
+		s_icon_agenda_bitmap = NULL;
+	}
 
 	window_destroy(window);
 	s_result_window = NULL;
