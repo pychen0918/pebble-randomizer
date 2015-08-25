@@ -21,11 +21,6 @@
     "resources": {
         "media": [
             {
-                "file": "images/icon_check_white.png",
-                "name": "ICON_CHECK_WHITE",
-                "type": "png"
-            },
-            {
                 "file": "data/loc_traditional_chinese.bin",
                 "name": "LOCALE_TRADITIONAL_CHINESE",
                 "type": "raw"
