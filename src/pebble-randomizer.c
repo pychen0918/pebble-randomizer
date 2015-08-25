@@ -150,16 +150,15 @@ static AppTimer *s_wait_timeout_timer;	// Timer for dismissing waiting window
 
 static GBitmap *s_icon_blank_bitmap;	// The blank icon for settings
 static GBitmap *s_icon_check_black_bitmap;	// The black check icon for settings
-#ifdef PBL_PLATFORM_BASALT
-static GBitmap *s_icon_check_white_bitmap;	// The white check icon for settings, while being highlighted
-#endif
 static GBitmap *s_icon_agenda_bitmap;	// The icon for action bar
 
 static GColor s_text_color;
 static GColor s_bg_color;
 static GColor s_highlight_text_color;
 static GColor s_highlight_bg_color;
-
+static GColor s_highlight_alt_text_color;
+static GColor s_highlight_alt_bg_color;
+	
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
 static MenuLayer *s_main_menu_layer;
@@ -402,6 +401,10 @@ static void main_window_load(Window *window) {
 	APP_LOG(APP_LOG_LEVEL_INFO, "Menu load");
 
 	s_main_menu_layer = menu_layer_create(bounds);
+#ifdef PBL_PLATFORM_BASALT
+	menu_layer_set_normal_colors(s_main_menu_layer, s_bg_color, s_text_color);
+	menu_layer_set_highlight_colors(s_main_menu_layer, s_highlight_bg_color, s_highlight_text_color);
+#endif
 	menu_layer_set_callbacks(s_main_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = main_menu_get_num_rows_callback,
 		.draw_row = main_menu_draw_row_handler,
@@ -472,9 +475,10 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	graphics_context_set_text_color(ctx, s_highlight_text_color);
-	graphics_context_set_fill_color(ctx, s_highlight_bg_color);
-	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18), 
+	graphics_context_set_text_color(ctx, s_highlight_alt_text_color);
+	graphics_context_set_fill_color(ctx, s_highlight_alt_bg_color);
+	graphics_fill_rect(ctx, layer_get_bounds(cell_layer), 0, GCornerNone);
+	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), 
 		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
@@ -505,6 +509,10 @@ static void list_window_load(Window *window) {
 	list_menu_sort_by_distance();
 
 	s_list_menu_layer = menu_layer_create(bounds);
+#ifdef PBL_PLATFORM_BASALT
+	menu_layer_set_normal_colors(s_list_menu_layer, s_bg_color, s_text_color);
+	menu_layer_set_highlight_colors(s_list_menu_layer, s_highlight_bg_color, s_highlight_text_color);
+#endif	
 	menu_layer_set_callbacks(s_list_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = list_menu_get_num_rows_callback,
 		.get_cell_height = list_menu_get_cell_height_callback,
@@ -600,8 +608,11 @@ static void result_window_load(Window *window) {
 	// action bar part
 	if(create_action_bar == true){
 		s_icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
-		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH - 3;
+		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH;
 		s_result_action_bar_layer = action_bar_layer_create();
+#ifdef PBL_PLATFORM_BASALT
+		action_bar_layer_set_background_color(s_result_action_bar_layer, s_highlight_alt_bg_color);
+#endif
 		action_bar_layer_add_to_window(s_result_action_bar_layer, window);
 		action_bar_layer_set_icon(s_result_action_bar_layer, BUTTON_ID_SELECT, s_icon_agenda_bitmap);
 	}
@@ -625,13 +636,13 @@ static void result_window_load(Window *window) {
 	text_layer_set_text(s_result_title_text_layer, title_text);
 	max_size = text_layer_get_content_size(s_result_title_text_layer);
 
-	// adjust title height
-	if(max_size.h > (bounds.size.h - sub_max_size.h))
-		title_height = (bounds.size.h - sub_max_size.h);  // title is very long: leave some space for sub-title.
-	else if(max_size.h < (bounds.size.h/2))
-		title_height = (bounds.size.h/2);  // title is short: make it half part
+	// adjust title height. Always have 10px padding for certain characters to display
+	if(max_size.h > (bounds.size.h - sub_max_size.h + 10))
+		title_height = (bounds.size.h - sub_max_size.h + 10);  // title is very long: leave some space for sub-title.
+	else if(max_size.h < (bounds.size.h/2 + 10))
+		title_height = (bounds.size.h/2 + 10);  // title is short: make it half part
 	else
-		title_height = max_size.h;  // title is long, but not very long: use current size
+		title_height = max_size.h + 10;  // title is long, but not very long: use current size
 
 	// create scroll layer
 	s_result_scroll_layer = scroll_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, title_height));
@@ -646,8 +657,8 @@ static void result_window_load(Window *window) {
 	text_layer_set_font(s_result_sub_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_result_sub_text_layer, GTextAlignmentLeft);
 	text_layer_set_overflow_mode(s_result_sub_text_layer, GTextOverflowModeFill);
-	text_layer_set_background_color(s_result_sub_text_layer, s_bg_color);
-	text_layer_set_text_color(s_result_sub_text_layer, s_text_color);
+	text_layer_set_background_color(s_result_sub_text_layer, s_highlight_bg_color);
+	text_layer_set_text_color(s_result_sub_text_layer, s_highlight_text_color);
 	text_layer_set_text(s_result_sub_text_layer, sub_text);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_sub_text_layer));
 }
@@ -713,9 +724,10 @@ static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_
 }
 
 static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	graphics_context_set_text_color(ctx, s_highlight_text_color);
-	graphics_context_set_fill_color(ctx, s_highlight_bg_color);
-	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
+	graphics_context_set_text_color(ctx, s_highlight_alt_text_color);
+	graphics_context_set_fill_color(ctx, s_highlight_alt_bg_color);
+	graphics_fill_rect(ctx, layer_get_bounds(cell_layer), 0, GCornerNone);
+	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
 static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
@@ -732,10 +744,11 @@ static void setting_window_load(Window *window){
 
 	s_icon_blank_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_BLANK);
 	s_icon_check_black_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_BLACK);
-#ifdef PBL_PLATFORM_BASALT
-	s_icon_check_white_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_WHITE);
-#endif
 	s_setting_main_menu_layer = menu_layer_create(bounds);
+#ifdef PBL_PLATFORM_BASALT
+	menu_layer_set_normal_colors(s_setting_main_menu_layer, s_bg_color, s_text_color);
+	menu_layer_set_highlight_colors(s_setting_main_menu_layer, s_highlight_bg_color, s_highlight_text_color);
+#endif
 	menu_layer_set_callbacks(s_setting_main_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = setting_main_menu_get_num_rows_callback,
 		.draw_row = setting_main_menu_draw_row_handler,
@@ -750,9 +763,6 @@ static void setting_window_load(Window *window){
 static void setting_window_unload(Window *window){
 	gbitmap_destroy(s_icon_blank_bitmap);
 	gbitmap_destroy(s_icon_check_black_bitmap);
-#ifdef PBL_PLATFORM_BASALT
-	gbitmap_destroy(s_icon_check_white_bitmap);
-#endif
 	menu_layer_destroy(s_setting_main_menu_layer);
 	window_destroy(window);
 	s_setting_window = NULL;
@@ -809,20 +819,8 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 			break;
 	}
 
-	if(cell_index->row == selected_index){
-#ifdef PBL_PLATFORM_BASALT
-		if(menu_cell_layer_is_highlighted(cell_layer)){
-			// in Basalt platform, we need to use white icon when highlighted
-			menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_white_bitmap);
-		}
-		else{
-			menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_black_bitmap);
-		}
-#else
-		// in Aplite platform, we simply use black black icon as the OS will invert it if highlighted
+	if(cell_index->row == selected_index)
 		menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_check_black_bitmap);
-#endif
-	}
 	else
 		menu_cell_basic_draw(ctx, cell_layer, text, NULL, s_icon_blank_bitmap);
 }
@@ -868,6 +866,9 @@ static void setting_sub_window_load(Window *window){
 		.draw_row = setting_sub_menu_draw_row_handler,
 		.select_click = setting_sub_menu_select_callback,
 	});
+#ifdef PBL_PLATFORM_BASALT
+	menu_layer_set_highlight_colors(s_setting_sub_menu_layer, s_highlight_bg_color, s_highlight_text_color);
+#endif
 	menu_layer_set_click_config_onto_window(s_setting_sub_menu_layer, window);
 	layer_add_child(window_layer, menu_layer_get_layer(s_setting_sub_menu_layer));
 }
@@ -919,7 +920,13 @@ static void wait_layer_update_proc(Layer *layer, GContext *ctx){
 	}
 
 	int width = (int)(float)(((float)s_wait_animation_counter / 100.0F) * bar_max_length);
-	graphics_context_set_stroke_color(ctx, GColorBlack);
+#ifdef PBL_PLATFORM_BASALT
+	graphics_context_set_stroke_color(ctx, s_highlight_text_color);
+	graphics_draw_round_rect(ctx, GRect(WAIT_ANIMATION_BAR_LEFT_MARGIN, y_pos, width, WAIT_ANIMATION_BAR_HEIGHT), WAIT_ANIMATION_BAR_RADIUS);
+	graphics_context_set_fill_color(ctx, s_highlight_bg_color);
+#else
+	graphics_context_set_fill_color(ctx, GColorBlack);
+#endif
 	graphics_fill_rect(ctx, GRect(WAIT_ANIMATION_BAR_LEFT_MARGIN, y_pos, width, WAIT_ANIMATION_BAR_HEIGHT), 
 			   WAIT_ANIMATION_BAR_RADIUS, GCornersAll);
 }
@@ -936,8 +943,8 @@ static void wait_window_load(Window *window) {
 	
 	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
-	text_layer_set_background_color(s_wait_text_layer, s_bg_color);
-	text_layer_set_text_color(s_wait_text_layer, s_text_color);
+	text_layer_set_background_color(s_wait_text_layer, s_highlight_alt_bg_color);
+	text_layer_set_text_color(s_wait_text_layer, s_highlight_alt_text_color);
 	text_layer_set_text(s_wait_text_layer, wait_layer_header_text);
 	layer_set_update_proc(s_wait_layer, wait_layer_update_proc);
 
@@ -1317,14 +1324,18 @@ static void initialize_const_strings(void){
 static void initialize_color(void){
 #ifdef PBL_PLATFORM_BASALT
 	s_text_color = GColorBlack;
-	s_bg_color = GColorRajah;
+	s_bg_color = GColorClear;
 	s_highlight_text_color = GColorBlack;
-	s_highlight_bg_color = GColorCeleste;
+	s_highlight_bg_color = GColorRajah;
+	s_highlight_alt_text_color = GColorWhite;
+	s_highlight_alt_bg_color = GColorDukeBlue;
 #else
 	s_text_color = GColorBlack;
 	s_bg_color = GColorClear;
 	s_highlight_text_color = GColorBlack;
 	s_highlight_bg_color = GColorClear;
+	s_highlight_alt_text_color = GColorBlack;
+	s_highlight_alt_bg_color = GColorClear;
 #endif
 }
 
