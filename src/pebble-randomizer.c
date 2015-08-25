@@ -619,9 +619,9 @@ static void result_window_load(Window *window) {
 	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, 2000));
 	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
 	text_layer_set_text_alignment(s_result_title_text_layer, GTextAlignmentLeft);
+	text_layer_set_overflow_mode(s_result_title_text_layer, GTextOverflowModeWordWrap);
 	text_layer_set_background_color(s_result_title_text_layer, s_bg_color);
 	text_layer_set_text_color(s_result_title_text_layer, s_text_color);
-	text_layer_set_overflow_mode(s_result_title_text_layer, GTextOverflowModeWordWrap);
 	text_layer_set_text(s_result_title_text_layer, title_text);
 	max_size = text_layer_get_content_size(s_result_title_text_layer);
 
@@ -632,7 +632,6 @@ static void result_window_load(Window *window) {
 		title_height = (bounds.size.h/2);  // title is short: make it half part
 	else
 		title_height = max_size.h;  // title is long, but not very long: use current size
-	text_layer_set_size(s_result_title_text_layer, max_size);
 
 	// create scroll layer
 	s_result_scroll_layer = scroll_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, title_height));
@@ -1316,11 +1315,11 @@ static void initialize_const_strings(void){
 }
 
 static void initialize_color(void){
-#ifdef PBL_COLOR
+#ifdef PBL_PLATFORM_BASALT
 	s_text_color = GColorBlack;
-	s_bg_color = GColorWhite;
+	s_bg_color = GColorRajah;
 	s_highlight_text_color = GColorBlack;
-	s_highlight_bg_color = GColorRajah;
+	s_highlight_bg_color = GColorCeleste;
 #else
 	s_text_color = GColorBlack;
 	s_bg_color = GColorClear;
