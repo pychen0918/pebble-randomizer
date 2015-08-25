@@ -15,8 +15,8 @@
     "capabilities": [
         "location"
     ],
-    "companyName": "pychen0918",
-    "longName": "Random Picker",
+    "companyName": "pychen",
+    "longName": "Where to Eat",
     "projectType": "native",
     "resources": {
         "media": [
@@ -59,12 +59,12 @@
         ]
     },
     "sdkVersion": "3",
-    "shortName": "Random Picker",
+    "shortName": "Where to Eat",
     "targetPlatforms": [
         "aplite",
         "basalt"
     ],
-    "uuid": "31a420a4-bff1-4d5d-ac3c-cc816a5071ac",
+    "uuid": "d6ebd864-cbc1-45d2-a794-0debb84d3981",
     "versionLabel": "1.0",
     "watchapp": {
         "watchface": false
