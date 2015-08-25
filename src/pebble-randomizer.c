@@ -155,6 +155,11 @@ static GBitmap *s_icon_check_white_bitmap;	// The white check icon for settings,
 #endif
 static GBitmap *s_icon_agenda_bitmap;	// The icon for action bar
 
+static GColor s_text_color;
+static GColor s_bg_color;
+static GColor s_highlight_text_color;
+static GColor s_highlight_bg_color;
+
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
 static MenuLayer *s_main_menu_layer;
@@ -446,12 +451,17 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
 #ifdef PBL_PLATFORM_BASALT
-	if(menu_cell_layer_is_highlighted(cell_layer))
-		graphics_context_set_text_color(ctx, GColorWhite);
-	else
-		graphics_context_set_text_color(ctx, GColorBlack);
+	if(menu_cell_layer_is_highlighted(cell_layer)){
+		graphics_context_set_text_color(ctx, s_highlight_text_color);
+		graphics_context_set_fill_color(ctx, s_highlight_bg_color);
+	}
+	else{
+		graphics_context_set_text_color(ctx, s_text_color);
+		graphics_context_set_fill_color(ctx, s_bg_color);
+	}
 #else
-	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_context_set_text_color(ctx, s_text_color);
+	graphics_context_set_fill_color(ctx, s_bg_color);
 #endif
 	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
 		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
@@ -462,7 +472,8 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_context_set_text_color(ctx, s_highlight_text_color);
+	graphics_context_set_fill_color(ctx, s_highlight_bg_color);
 	graphics_draw_text(ctx, setting_type_option_text[s_user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18), 
 		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
@@ -608,8 +619,8 @@ static void result_window_load(Window *window) {
 	s_result_title_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, 2000));
 	text_layer_set_font(s_result_title_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
 	text_layer_set_text_alignment(s_result_title_text_layer, GTextAlignmentLeft);
-	text_layer_set_background_color(s_result_title_text_layer, GColorClear);
-	text_layer_set_text_color(s_result_title_text_layer, GColorBlack);
+	text_layer_set_background_color(s_result_title_text_layer, s_bg_color);
+	text_layer_set_text_color(s_result_title_text_layer, s_text_color);
 	text_layer_set_overflow_mode(s_result_title_text_layer, GTextOverflowModeWordWrap);
 	text_layer_set_text(s_result_title_text_layer, title_text);
 	max_size = text_layer_get_content_size(s_result_title_text_layer);
@@ -636,8 +647,8 @@ static void result_window_load(Window *window) {
 	text_layer_set_font(s_result_sub_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_result_sub_text_layer, GTextAlignmentLeft);
 	text_layer_set_overflow_mode(s_result_sub_text_layer, GTextOverflowModeFill);
-	text_layer_set_background_color(s_result_sub_text_layer, GColorClear);
-	text_layer_set_text_color(s_result_sub_text_layer, GColorBlack);
+	text_layer_set_background_color(s_result_sub_text_layer, s_bg_color);
+	text_layer_set_text_color(s_result_sub_text_layer, s_text_color);
 	text_layer_set_text(s_result_sub_text_layer, sub_text);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_sub_text_layer));
 }
@@ -703,7 +714,8 @@ static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_
 }
 
 static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
-	graphics_context_set_text_color(ctx, GColorBlack);
+	graphics_context_set_text_color(ctx, s_highlight_text_color);
+	graphics_context_set_fill_color(ctx, s_highlight_bg_color);
 	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18), layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
 }
 
@@ -925,8 +937,8 @@ static void wait_window_load(Window *window) {
 	
 	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
 	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
-	text_layer_set_background_color(s_wait_text_layer, GColorClear);
-	text_layer_set_text_color(s_wait_text_layer, GColorBlack);
+	text_layer_set_background_color(s_wait_text_layer, s_bg_color);
+	text_layer_set_text_color(s_wait_text_layer, s_text_color);
 	text_layer_set_text(s_wait_text_layer, wait_layer_header_text);
 	layer_set_update_proc(s_wait_layer, wait_layer_update_proc);
 
@@ -1001,8 +1013,8 @@ static void detail_window_load(Window *window) {
 	s_detail_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, 2000));  // increase size
 	text_layer_set_font(s_detail_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_detail_text_layer, GTextAlignmentLeft);
-	text_layer_set_background_color(s_detail_text_layer, GColorClear);
-	text_layer_set_text_color(s_detail_text_layer, GColorBlack);
+	text_layer_set_background_color(s_detail_text_layer, s_bg_color);
+	text_layer_set_text_color(s_detail_text_layer, s_text_color);
 	text_layer_set_text(s_detail_text_layer, text);
 	max_size = text_layer_get_content_size(s_detail_text_layer);
 	max_size.h += 10;  // increase height for Chinese fonts
@@ -1303,11 +1315,27 @@ static void initialize_const_strings(void){
 	distance_unit = _("meters");
 }
 
+static void initialize_color(void){
+#ifdef PBL_COLOR
+	s_text_color = GColorBlack;
+	s_bg_color = GColorWhite;
+	s_highlight_text_color = GColorBlack;
+	s_highlight_bg_color = GColorRajah;
+#else
+	s_text_color = GColorBlack;
+	s_bg_color = GColorClear;
+	s_highlight_text_color = GColorBlack;
+	s_highlight_bg_color = GColorClear;
+#endif
+}
+
 static void init(){
 	// Initialize locale framework
 	locale_init();
 
 	initialize_const_strings();
+
+	initialize_color();
 
 	// Initialize random seed
 	srand(time(NULL));
