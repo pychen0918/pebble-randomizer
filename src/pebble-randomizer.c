@@ -6,6 +6,7 @@
 
 #define MAIN_MENU_ROWS			3	// Random, list and settings
 #define MAIN_MENU_TEXT_LENGTH		64
+#define MAIN_BANNER_HEIGHT		32
 
 // What kind of operation user is currently performing
 #define USER_OPERATION_RANDOM		0
@@ -113,6 +114,7 @@ typedef struct __menu_status_t{
 // --------------------------------------------------------------------------------------
 
 const char *main_menu_text[MAIN_MENU_ROWS];
+const char *main_banner_text;
 const char *setting_main_menu_header_text;
 const char *wait_layer_header_text;
 
@@ -161,6 +163,7 @@ static GColor s_highlight_alt_bg_color;
 	
 // The main menu with "Random" and "List" options
 static Window *s_main_window;
+static Layer *s_main_banner_layer;
 static MenuLayer *s_main_menu_layer;
 
 // The random pick result
@@ -393,6 +396,16 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 		
 }
 
+static void main_banner_layer_update_proc(Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+
+	graphics_context_set_text_color(ctx, s_highlight_alt_text_color);
+	graphics_context_set_fill_color(ctx, s_highlight_alt_bg_color);
+	graphics_fill_rect(ctx, bounds, MAIN_BANNER_HEIGHT, GCornerNone);
+	graphics_draw_text(ctx, main_banner_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), bounds,
+			   GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+}
+
 static void main_window_load(Window *window) {
 	// Create Window's child Layers here
 	Layer *window_layer = window_get_root_layer(window);
@@ -400,10 +413,16 @@ static void main_window_load(Window *window) {
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Menu load");
 
-	s_main_menu_layer = menu_layer_create(bounds);
+	s_main_banner_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, MAIN_BANNER_HEIGHT));
+	layer_set_update_proc(s_main_banner_layer, main_banner_layer_update_proc);
+	layer_add_child(window_layer, s_main_banner_layer);
+
+	s_main_menu_layer = menu_layer_create(GRect(bounds.origin.x, bounds.origin.y+MAIN_BANNER_HEIGHT, 
+						    bounds.size.w, bounds.size.h-MAIN_BANNER_HEIGHT));
 #ifdef PBL_PLATFORM_BASALT
 	menu_layer_set_normal_colors(s_main_menu_layer, s_bg_color, s_text_color);
 	menu_layer_set_highlight_colors(s_main_menu_layer, s_highlight_bg_color, s_highlight_text_color);
+	menu_layer_pad_bottom_enable(s_main_menu_layer, false);
 #endif
 	menu_layer_set_callbacks(s_main_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = main_menu_get_num_rows_callback,
@@ -415,6 +434,7 @@ static void main_window_load(Window *window) {
 }
 
 static void main_window_unload(Window *window) {
+	layer_destroy(s_main_banner_layer);
 	menu_layer_destroy(s_main_menu_layer);
 }
 
@@ -941,7 +961,7 @@ static void wait_window_load(Window *window) {
 	s_wait_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y + WAIT_TEXT_LAYER_HEIGHT, 
 					  bounds.size.w, bounds.size.w - WAIT_TEXT_LAYER_HEIGHT));
 	
-	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24));
+	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
 	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
 	text_layer_set_background_color(s_wait_text_layer, s_highlight_alt_bg_color);
 	text_layer_set_text_color(s_wait_text_layer, s_highlight_alt_text_color);
@@ -1269,9 +1289,10 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 }
 
 static void initialize_const_strings(void){
-	main_menu_text[0] = _("Random!");
-	main_menu_text[1] = _("List");
-	main_menu_text[2] = _("Settings");
+	main_menu_text[0] = _("Pick For Me!");
+	main_menu_text[1] = _("List All");
+	main_menu_text[2] = _("Options");
+	main_banner_text = _("Where to eat?");
 	setting_main_menu_header_text = _("Options");
 	wait_layer_header_text = _("Searching...");
 
@@ -1279,19 +1300,19 @@ static void initialize_const_strings(void){
 	query_status_error_message[1] = _("No Result");
 	query_status_error_message[2] = _("GPS Timeout");
 	query_status_error_message[3] = _("API Error");
-	query_status_error_message[4] = _("No Detailed Information");
+	query_status_error_message[4] = _("No Result");
 	query_status_error_sub_message[0] = "";
 	query_status_error_sub_message[1] = _("Please try other search options");
 	query_status_error_sub_message[2] = _("Please try again later");
 	query_status_error_sub_message[3] = "";
-	query_status_error_sub_message[4] = _("Cannot find more information about this restraunt");
+	query_status_error_sub_message[4] = _("Cannot find any information about this restraunt");
 
 	unknown_error_message = _("Unknown error");
 	unknown_error_sub_message = _("Please bring the following message to the author:");
 
 	setting_main_menu_text[0] = _("Range");
 	setting_main_menu_text[1] = _("Keyword");
-	setting_main_menu_text[2] = _("Open Now");
+	setting_main_menu_text[2] = _("Open Now Only");
 	setting_range_option_text[0] = _("500 M");
 	setting_range_option_text[1] = _("1 KM");
 	setting_range_option_text[2] = _("5 KM");
