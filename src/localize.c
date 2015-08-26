@@ -12,8 +12,6 @@ void locale_init(void) {
   ResHandle locale_handle = NULL;
   int locale_size = 0;
 
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "locale_str=%s",locale_str);
-
   if (strncmp(locale_str, "cn", 2) == 0) {
     locale_handle = resource_get_handle(RESOURCE_ID_LOCALE_SIMPLIFIED_CHINESE);
     locale_size = resource_size(locale_handle);

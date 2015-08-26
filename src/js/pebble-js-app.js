@@ -76,7 +76,6 @@ function locationSuccess(pos){
 			g_opennow_text[g_option_opennow] +
 			"&key=" + api_key;
 	}
-	console.log("url: " + url);
 
 	xhrRequest(url, 'GET',
 		function(responseText) {
@@ -113,17 +112,11 @@ function locationSuccess(pos){
 					if(g_query_type == 0){ // list
 						key = list_first_key;
 						for(i in json.results){
-							console.log("i = " + i);
 							lat = json.results[i].geometry.location.lat;
 							lon = json.results[i].geometry.location.lng;
 							place_id = json.results[i].place_id;
 							distance = getDistance(pos.coords.latitude, pos.coords.longitude, lat, lon);
 							direction = getDirection(pos.coords.latitude, pos.coords.longitude, lat, lon);
-							console.log(" key: " + key + 
-								    " name: " + json.results[i].name + 
-								    " direction: " + direction + 
-								    " distance: " + distance +
-								    " place_id: " + place_id);
 							dictionary[key] = json.results[i].name + "|" + direction + "|" + distance + "|" + place_id;
 							key++;
 						}
@@ -153,11 +146,6 @@ function locationSuccess(pos){
 							dictionary['detail_phone'] = phone;
 
 						dictionary['status'] = status_code['success'];
-						console.log("name: "+json.result.name + 
-							" phone: "+dictionary['detail_phone'] +
-							" place_id:"+dictionary['query_place_id']+
-							" rating: "+dictionary['detail_rating']+
-							" address: "+dictionary['detail_address']);
 					}
 				}
 			} 
@@ -225,7 +213,6 @@ Pebble.addEventListener("appmessage",
 	function(e) {
 		g_query_type = e.payload['query_type'];
 		g_query_uid = e.payload['query_uid'];
-		console.log("e.payload['query_type']="+e.payload['query_type']+" e.payload['query_uid']="+e.payload['query_uid']);
 		if(g_query_type == 0){ // list
 			g_option_range = e.payload['query_option_range'];
 			g_option_type = e.payload['query_option_type'];

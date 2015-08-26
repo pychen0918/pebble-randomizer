@@ -363,8 +363,6 @@ static void main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *c
 	valid_result = validate_data();
 	s_menu_state.user_operation = cell_index->row;
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Main Menu Select: %d", (int)(s_menu_state.user_operation));
-
 	switch(s_menu_state.user_operation){
 		case USER_OPERATION_RANDOM:
 			if(valid_result)
@@ -410,8 +408,6 @@ static void main_window_load(Window *window) {
 	// Create Window's child Layers here
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-
-	APP_LOG(APP_LOG_LEVEL_INFO, "Menu load");
 
 	s_main_banner_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, MAIN_BANNER_HEIGHT));
 	layer_set_update_proc(s_main_banner_layer, main_banner_layer_update_proc);
@@ -525,7 +521,6 @@ static void list_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "List load");
 	list_menu_sort_by_distance();
 
 	s_list_menu_layer = menu_layer_create(bounds);
@@ -595,7 +590,6 @@ static void result_window_load(Window *window) {
 	int title_height;
 	TextLayer *temp;
 	
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window load");
 	status = s_search_result.query_status;
 	switch(status){
 		case QUERY_STATUS_SUCCESS:
@@ -684,8 +678,6 @@ static void result_window_load(Window *window) {
 }
 
 static void result_window_unload(Window *window) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window unload");
-
 	text_layer_destroy(s_result_title_text_layer);
 	text_layer_destroy(s_result_sub_text_layer);
 	action_bar_layer_destroy(s_result_action_bar_layer);
@@ -700,9 +692,7 @@ static void result_window_unload(Window *window) {
 }
 
 static void result_window_push(void){
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window push");
 	if(!s_result_window){
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Create new result window");
 		// Create result window
 		s_result_window = window_create();
 		window_set_window_handlers(s_result_window, (WindowHandlers){
@@ -710,7 +700,6 @@ static void result_window_push(void){
 			.unload = result_window_unload
 		});
 	}
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "About to push result window to stack");
 	window_stack_push(s_result_window, true);
 }
 
@@ -759,8 +748,6 @@ static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, Menu
 static void setting_window_load(Window *window){
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-
-	APP_LOG(APP_LOG_LEVEL_INFO, "Settings load");
 
 	s_icon_blank_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_BLANK);
 	s_icon_check_black_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_BLACK);
@@ -864,7 +851,6 @@ static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuI
 			break;
 	}
 	if(memcmp(&old, &s_user_setting, sizeof(old))){
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings changed");
 		s_search_result.is_setting_changed = true;
 	}
 	else
@@ -878,8 +864,6 @@ static void setting_sub_window_load(Window *window){
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Settings sub window load");
-	
 	s_setting_sub_menu_layer = menu_layer_create(bounds);
 	menu_layer_set_callbacks(s_setting_sub_menu_layer, NULL, (MenuLayerCallbacks){
 		.get_num_rows = setting_sub_menu_get_num_rows_callback,
@@ -955,8 +939,6 @@ static void wait_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Wait load");
-
 	s_wait_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, WAIT_TEXT_LAYER_HEIGHT));
 	s_wait_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y + WAIT_TEXT_LAYER_HEIGHT, 
 					  bounds.size.w, bounds.size.w - WAIT_TEXT_LAYER_HEIGHT));
@@ -1020,8 +1002,6 @@ static void detail_window_load(Window *window) {
 	GSize max_size;
 	RestaurantInformation *ptr = &(s_search_result.restaurant_info[index]);
 	
-	APP_LOG(APP_LOG_LEVEL_INFO, "Detail load");
-
 	if(ptr->rating<=5 && ptr->rating>0)
 		snprintf(rating_str, sizeof(rating_str), "%s%d %s", detail_rating_text, (int)(ptr->rating), detail_star_text);
 	else
@@ -1088,8 +1068,6 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 	char buf[256], temp_name[256], temp_place_id[256], temp_direction[4], temp_distance[16];
 	char errmsg[256];
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_list_message_handler");
-
 	index = 0;
 	while(t != NULL) {
 		switch(t->key){
@@ -1125,7 +1103,6 @@ static int parse_list_message_handler(DictionaryIterator *iterator){
 					strncpy(temp_place_id, &buf[head], len);
 					temp_place_id[len] = '\0';
 					// Assign value
-					APP_LOG(APP_LOG_LEVEL_DEBUG, "%s %s %s %s", temp_name, temp_direction, temp_distance, temp_place_id);
 					s_search_result.restaurant_info[index].name = alloc_and_copy_string(temp_name);
 					s_search_result.restaurant_info[index].direction = (uint8_t)atoi(temp_direction);
 					s_search_result.restaurant_info[index].distance = (uint16_t)atoi(temp_distance);
@@ -1161,8 +1138,6 @@ static int parse_detail_message_handler(DictionaryIterator *iterator){
 	char errmsg[256];
 	int index = -1;
 	int ret = DATA_INVALID;
-
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_detail_message_handler");
 
 	while(t!=NULL){
 		switch(t->key){
@@ -1217,7 +1192,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	uint8_t expect_uid = get_previous_uid();
 	Window *top_window;
 
-	APP_LOG(APP_LOG_LEVEL_INFO, "Message Received!");
 	s_search_result.is_querying = false;  // reset the flag
 	s_search_result.is_setting_changed = false;
 
@@ -1231,8 +1205,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 		t = dict_read_next(iterator);
 	}
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "query_type:%d uid:%d", (int)message_query_type, (int)message_uid);
-
 	if(message_query_type == QUERY_TYPE_LIST)
 		parse_result = parse_list_message_handler(iterator);
 	else if(message_query_type == QUERY_TYPE_DETAIL)
@@ -1240,18 +1212,13 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 	else
 		APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown query type");
 
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "parse_result=%d query_status=%d", parse_result, s_search_result.query_status);
-
 	// Check current window
 	// If we are waiting, display the list, result or detail window
 	top_window = window_stack_get_top_window();
 	if(top_window == s_wait_window){
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Is waiting");
 		// Must make sure we received the query that we expected before display
 		if(expect_uid == message_uid){
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "UID matched");
 			if(s_menu_state.user_operation == USER_OPERATION_RANDOM){
-				APP_LOG(APP_LOG_LEVEL_DEBUG, "operation random");
 				result_window_push();
 			}
 			else if(s_menu_state.user_operation == USER_OPERATION_LIST){
@@ -1274,17 +1241,14 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-	APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
 	s_search_result.is_querying = false;
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Outbox send success!");
 	s_search_result.is_querying = true;
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-	APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
 	s_search_result.is_querying = false;  // reset the flag
 }
 
