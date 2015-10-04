@@ -62,10 +62,11 @@
     "shortName": "Where to Eat",
     "targetPlatforms": [
         "aplite",
-        "basalt"
+        "basalt",
+	"chalk"
     ],
     "uuid": "d6ebd864-cbc1-45d2-a794-0debb84d3981",
-    "versionLabel": "1.0",
+    "versionLabel": "1.1",
     "watchapp": {
         "watchface": false
     }
