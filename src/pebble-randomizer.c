@@ -590,7 +590,7 @@ static void result_window_load(Window *window) {
 	RestaurantInformation *ptr;
 	uint8_t status;
 	int text_layer_width;
-	bool create_action_bar = false; // create action bar only when valid result is displayed
+	bool valid_result = false; // create action bar and bind key pressing only when valid result is displayed
 	GSize max_size, sub_max_size;
 	int title_height;
 	TextLayer *temp;
@@ -599,7 +599,7 @@ static void result_window_load(Window *window) {
 	status = s_search_result.query_status;
 	switch(status){
 		case QUERY_STATUS_SUCCESS:
-			create_action_bar = true;
+			valid_result = true;
 			// Randomly pick up the restaurant
 			s_search_result.random_result = rand()%s_search_result.num_of_restaurant;
 			// Collect required fields
@@ -626,7 +626,7 @@ static void result_window_load(Window *window) {
 	}
 	
 	// action bar part
-	if(create_action_bar == true){
+	if(valid_result == true){
 		s_icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
 		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH;
 		s_result_action_bar_layer = action_bar_layer_create();
@@ -666,8 +666,10 @@ static void result_window_load(Window *window) {
 
 	// create scroll layer
 	s_result_scroll_layer = scroll_layer_create(GRect(bounds.origin.x, bounds.origin.y, text_layer_width, title_height));
-	scroll_layer_set_click_config_onto_window(s_result_scroll_layer, window);
-	scroll_layer_set_callbacks(s_result_scroll_layer, (ScrollLayerCallbacks){.click_config_provider=result_click_config_provider});
+	if(valid_result == true){
+		scroll_layer_set_click_config_onto_window(s_result_scroll_layer, window);
+		scroll_layer_set_callbacks(s_result_scroll_layer, (ScrollLayerCallbacks){.click_config_provider=result_click_config_provider});
+	}
 	scroll_layer_set_content_size(s_result_scroll_layer, GSize(text_layer_width, max_size.h));
 	scroll_layer_add_child(s_result_scroll_layer, text_layer_get_layer(s_result_title_text_layer));
 	layer_add_child(window_layer, scroll_layer_get_layer(s_result_scroll_layer));
