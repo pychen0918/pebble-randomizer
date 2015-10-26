@@ -77,20 +77,35 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 	graphics_context_set_text_color(ctx, text_color);
 	graphics_context_set_fill_color(ctx, bg_color);
 #endif
+
+#ifdef PBL_ROUND
+	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
+		GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+	graphics_draw_text(ctx, sub_text, fonts_get_system_font(FONT_KEY_GOTHIC_18),
+		GRect(bounds.origin.x+5, bounds.origin.y + bounds.size.h - 22, bounds.size.w, bounds.size.h),
+		GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+#else
 	graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
 		GRect(bounds.origin.x+5, bounds.origin.y-2, bounds.size.w-5, bounds.size.h),
 		GTextOverflowModeWordWrap, GTextAlignmentLeft, NULL);
 	graphics_draw_text(ctx, sub_text, fonts_get_system_font(FONT_KEY_GOTHIC_18),
 		GRect(bounds.origin.x+5, bounds.origin.y + bounds.size.h - 22, bounds.size.w, bounds.size.h),
 		GTextOverflowModeFill, GTextAlignmentLeft, NULL);
+#endif
 }
 
 static void list_menu_draw_header_handler(GContext *ctx, const Layer *cell_layer, uint16_t section_index, void *callback_context){
 	graphics_context_set_text_color(ctx, highlight_alt_text_color);
 	graphics_context_set_fill_color(ctx, highlight_alt_bg_color);
 	graphics_fill_rect(ctx, layer_get_bounds(cell_layer), 0, GCornerNone);
+#ifdef PBL_ROUND
+	graphics_draw_text(ctx, setting_type_option_text[user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), 
+		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentCenter, NULL); 
+#else
 	graphics_draw_text(ctx, setting_type_option_text[user_setting.type], fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), 
 		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
+#endif
 }
 
 static void list_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
