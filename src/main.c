@@ -220,8 +220,13 @@ static void main_banner_layer_update_proc(Layer *layer, GContext *ctx){
 	graphics_context_set_text_color(ctx, highlight_alt_text_color);
 	graphics_context_set_fill_color(ctx, highlight_alt_bg_color);
 	graphics_fill_rect(ctx, bounds, MAIN_BANNER_HEIGHT, GCornerNone);
+#ifdef PBL_ROUND
+	graphics_draw_text(ctx, main_banner_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), 
+		GRect(bounds.origin.x, bounds.origin.y+MAIN_BANNER_TOP_MARGIN, bounds.size.w, bounds.size.h), GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+#else
 	graphics_draw_text(ctx, main_banner_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), bounds,
 			   GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+#endif
 }
 
 static void main_window_load(Window *window) {
@@ -234,9 +239,13 @@ static void main_window_load(Window *window) {
 	s_main_banner_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, MAIN_BANNER_HEIGHT));
 	layer_set_update_proc(s_main_banner_layer, main_banner_layer_update_proc);
 	layer_add_child(window_layer, s_main_banner_layer);
-
 	s_main_menu_layer = menu_layer_create(GRect(bounds.origin.x, bounds.origin.y+MAIN_BANNER_HEIGHT, 
 						    bounds.size.w, bounds.size.h-MAIN_BANNER_HEIGHT));
+#ifdef PBL_ROUND
+	// we only have 3 options, disable center focus looks better
+	menu_layer_set_center_focused(s_main_menu_layer, false);
+#endif
+
 #ifdef PBL_COLOR
 	menu_layer_set_normal_colors(s_main_menu_layer, bg_color, text_color);
 	menu_layer_set_highlight_colors(s_main_menu_layer, highlight_bg_color, highlight_text_color);

@@ -11,7 +11,12 @@
 // Main Menu UI
 #define MAIN_MENU_ROWS			3	// Random, list and settings
 #define MAIN_MENU_TEXT_LENGTH		64
+#ifdef PBL_ROUND
+#define MAIN_BANNER_HEIGHT		44
+#define MAIN_BANNER_TOP_MARGIN		12
+#else
 #define MAIN_BANNER_HEIGHT		32
+#endif
 
 // What kind of operation user is currently performing
 #define USER_OPERATION_RANDOM		0
