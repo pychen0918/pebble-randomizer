@@ -6,10 +6,18 @@
 
 // The random pick result
 static Window *s_result_window;
+#ifdef PBL_ROUND
+static Layer *s_result_title_layer;
+static Layer *s_result_sub_layer;
+#else
 static TextLayer *s_result_title_text_layer;
 static TextLayer *s_result_sub_text_layer;
-static ActionBarLayer *s_result_action_bar_layer;
 static ScrollLayer *s_result_scroll_layer;
+#endif
+static ActionBarLayer *s_result_action_bar_layer;
+
+static char title_text[256], sub_text[256];
+static int text_layer_width;
 
 static void result_select_click_handler(ClickRecognizerRef recognizer, void *context) {
 	menu_state.user_detail_index = search_result.random_result;
@@ -30,17 +38,41 @@ static void result_click_config_provider(void *context){
 	window_single_click_subscribe(BUTTON_ID_SELECT, (ClickHandler)result_select_click_handler);
 }
 
+#ifdef PBL_ROUND
+static void result_title_layer_update_proc(Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+
+	graphics_context_set_text_color(ctx, text_color);
+	graphics_context_set_fill_color(ctx, bg_color);
+	graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+	graphics_draw_text(ctx, title_text, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD), 
+		GRect(bounds.origin.x+20, bounds.origin.y+20, text_layer_width-20, 100), GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static void result_sub_layer_update_proc(Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+
+	graphics_context_set_text_color(ctx, highlight_text_color);
+	graphics_context_set_fill_color(ctx, highlight_bg_color);
+	graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+	graphics_draw_text(ctx, sub_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), 
+		GRect(bounds.origin.x+20, bounds.origin.y, text_layer_width-20, 60), GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+}
+#endif
+
 static void result_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
-	static char title_text[256], sub_text[256];
 	RestaurantInformation *ptr;
 	uint8_t status;
-	int text_layer_width;
 	bool valid_result = false; // create action bar and bind key pressing only when valid result is displayed
+#ifdef PBL_ROUND
+	// no need for the following variables
+#else
 	GSize max_size, sub_max_size;
 	int title_height;
 	TextLayer *temp;
+#endif
 	
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window load");
 	status = search_result.query_status;
@@ -71,7 +103,36 @@ static void result_window_load(Window *window) {
 			snprintf(sub_text, sizeof(sub_text), "%s %s%d", unknown_error_sub_message, "Incorrect query status:",status);
 			break;
 	}
-	
+
+#ifdef PBL_ROUND
+	// action bar part
+	if(valid_result == true){
+		icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
+		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH;
+		s_result_action_bar_layer = action_bar_layer_create();
+#ifdef PBL_COLOR
+		action_bar_layer_set_background_color(s_result_action_bar_layer, highlight_alt_bg_color);
+#endif
+	}
+	else{
+		text_layer_width = bounds.size.w;
+	}
+
+	// title part
+	s_result_title_layer = layer_create(bounds);
+	layer_set_update_proc(s_result_title_layer, result_title_layer_update_proc);
+
+	// subtitle part
+	s_result_sub_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y+120, bounds.size.w, bounds.size.h-100));
+	layer_set_update_proc(s_result_sub_layer, result_sub_layer_update_proc);
+
+	layer_add_child(window_layer, s_result_title_layer);
+	layer_add_child(window_layer, s_result_sub_layer);
+	action_bar_layer_add_to_window(s_result_action_bar_layer, window);
+	action_bar_layer_set_icon(s_result_action_bar_layer, BUTTON_ID_SELECT, icon_agenda_bitmap);
+	action_bar_layer_set_click_config_provider(s_result_action_bar_layer, result_click_config_provider);
+
+#else // #ifdef PBL_ROUND	
 	// action bar part
 	if(valid_result == true){
 		icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
@@ -130,15 +191,21 @@ static void result_window_load(Window *window) {
 	text_layer_set_text_color(s_result_sub_text_layer, highlight_text_color);
 	text_layer_set_text(s_result_sub_text_layer, sub_text);
 	layer_add_child(window_layer, text_layer_get_layer(s_result_sub_text_layer));
+#endif // #ifdef PBL_ROUND	
 }
 
 static void result_window_unload(Window *window) {
 	APP_LOG(APP_LOG_LEVEL_DEBUG, "Result window unload");
 
+#ifdef PBL_ROUND
+	layer_destroy(s_result_title_layer);
+	layer_destroy(s_result_sub_layer);
+#else
 	text_layer_destroy(s_result_title_text_layer);
 	text_layer_destroy(s_result_sub_text_layer);
-	action_bar_layer_destroy(s_result_action_bar_layer);
 	scroll_layer_destroy(s_result_scroll_layer);
+#endif
+	action_bar_layer_destroy(s_result_action_bar_layer);
 	if(icon_agenda_bitmap != NULL){
 		gbitmap_destroy(icon_agenda_bitmap);
 		icon_agenda_bitmap = NULL;
