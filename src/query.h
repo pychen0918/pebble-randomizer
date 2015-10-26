@@ -1,6 +1,8 @@
 #ifndef __QUERY_H__
 #define __QUERY_H__
+
 #include <pebble.h>
+
 // If changed the following status code, the js file might need to be updated
 // Also need to check corresponding const error message strings
 #define QUERY_STATUS_SUCCESS		0

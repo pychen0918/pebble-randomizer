@@ -22,6 +22,14 @@
 // Useful macros
 #define DATA_VALID			0
 #define DATA_INVALID			1
+#define MESSAGE_UID_INVALID		0
+#define MESSAGE_UID_FIRST		1
+#define MESSAGE_UID_MAX			255
+
+// Default user settings
+#define DEFAULT_SEARCH_RANGE		1	// 1km
+#define DEFAULT_SEARCH_TYPE		1	// Restaurant
+#define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
 
 // Key for appmessage
 #define KEY_STATUS			0
@@ -87,6 +95,17 @@ extern SearchResult search_result;	// The main data structure to store the retur
 extern UserSetting user_setting;	// The main data structure to store custom searching configuations.
 extern MenuState menu_state;		// The main data structure to store user's selection on the menu
 
+extern GBitmap *icon_blank_bitmap;	// The blank icon for settings
+extern GBitmap *icon_check_black_bitmap;// The black check icon for settings
+extern GBitmap *icon_agenda_bitmap;	// The icon for action bar
+
+extern GColor text_color;
+extern GColor bg_color;
+extern GColor highlight_text_color;
+extern GColor highlight_bg_color;
+extern GColor highlight_alt_text_color;
+extern GColor highlight_alt_bg_color;
+	
 extern const char *main_menu_text[MAIN_MENU_ROWS];
 extern const char *main_banner_text;
 extern const char *setting_main_menu_header_text;
@@ -135,4 +154,9 @@ void *alloc_and_copy_string(char* string);
 // search for certain store with place_id
 int find_index_from_place_id(char *place_id);
 
+// Free the dynamically allocated space in search_result
+void free_search_result(void);
+
+// Reset the sorted index
+void reset_sorted_index(void);
 #endif // #ifndef __MAIN_H__
