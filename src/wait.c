@@ -45,7 +45,7 @@ static void wait_layer_update_proc(Layer *layer, GContext *ctx){
 	}
 
 	int width = (int)(float)(((float)s_wait_animation_counter / 100.0F) * bar_max_length);
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	graphics_context_set_stroke_color(ctx, highlight_text_color);
 	graphics_draw_round_rect(ctx, GRect(WAIT_ANIMATION_BAR_LEFT_MARGIN, y_pos, width, WAIT_ANIMATION_BAR_HEIGHT), WAIT_ANIMATION_BAR_RADIUS);
 	graphics_context_set_fill_color(ctx, highlight_bg_color);

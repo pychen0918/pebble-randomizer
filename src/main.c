@@ -237,7 +237,7 @@ static void main_window_load(Window *window) {
 
 	s_main_menu_layer = menu_layer_create(GRect(bounds.origin.x, bounds.origin.y+MAIN_BANNER_HEIGHT, 
 						    bounds.size.w, bounds.size.h-MAIN_BANNER_HEIGHT));
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	menu_layer_set_normal_colors(s_main_menu_layer, bg_color, text_color);
 	menu_layer_set_highlight_colors(s_main_menu_layer, highlight_bg_color, highlight_text_color);
 	menu_layer_pad_bottom_enable(s_main_menu_layer, false);
@@ -389,7 +389,7 @@ static void initialize_const_strings(void){
 }
 
 static void initialize_color(void){
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	text_color = GColorBlack;
 	bg_color = GColorClear;
 	highlight_text_color = GColorBlack;

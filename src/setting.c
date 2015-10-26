@@ -62,7 +62,7 @@ static void setting_window_load(Window *window){
 	icon_blank_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_BLANK);
 	icon_check_black_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_CHECK_BLACK);
 	s_setting_main_menu_layer = menu_layer_create(bounds);
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	menu_layer_set_normal_colors(s_setting_main_menu_layer, bg_color, text_color);
 	menu_layer_set_highlight_colors(s_setting_main_menu_layer, highlight_bg_color, highlight_text_color);
 #endif
@@ -183,7 +183,7 @@ static void setting_sub_window_load(Window *window){
 		.draw_row = setting_sub_menu_draw_row_handler,
 		.select_click = setting_sub_menu_select_callback,
 	});
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	menu_layer_set_highlight_colors(s_setting_sub_menu_layer, highlight_bg_color, highlight_text_color);
 #endif
 	menu_layer_set_click_config_onto_window(s_setting_sub_menu_layer, window);

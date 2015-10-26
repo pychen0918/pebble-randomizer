@@ -64,7 +64,7 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 
 	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
 
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	if(menu_cell_layer_is_highlighted(cell_layer)){
 		graphics_context_set_text_color(ctx, highlight_text_color);
 		graphics_context_set_fill_color(ctx, highlight_bg_color);
@@ -120,7 +120,7 @@ static void list_window_load(Window *window) {
 	list_menu_sort_by_distance();
 
 	s_list_menu_layer = menu_layer_create(bounds);
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 	menu_layer_set_normal_colors(s_list_menu_layer, bg_color, text_color);
 	menu_layer_set_highlight_colors(s_list_menu_layer, highlight_bg_color, highlight_text_color);
 #endif	

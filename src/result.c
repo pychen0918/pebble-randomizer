@@ -77,7 +77,7 @@ static void result_window_load(Window *window) {
 		icon_agenda_bitmap = gbitmap_create_with_resource(RESOURCE_ID_ICON_AGENDA);
 		text_layer_width = bounds.size.w - ACTION_BAR_WIDTH;
 		s_result_action_bar_layer = action_bar_layer_create();
-#ifdef PBL_PLATFORM_BASALT
+#ifdef PBL_COLOR
 		action_bar_layer_set_background_color(s_result_action_bar_layer, highlight_alt_bg_color);
 #endif
 		action_bar_layer_add_to_window(s_result_action_bar_layer, window);
