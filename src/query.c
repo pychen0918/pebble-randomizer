@@ -52,6 +52,10 @@ int parse_list_message_handler(DictionaryIterator *iterator){
 			case KEY_QUERY_ERROR_MESSAGE:
 				strncpy(errmsg, t->value->cstring, sizeof(errmsg));
 				break;
+			case KEY_QUERY_TYPE:
+			case KEY_QUERY_UID:
+				// Simply ignore these keys, they are handled by receive callback
+				break;
 			default:
 				//  Check if the key fall in the data range
 				if((t->key >= KEY_LIST_FIRST) && (t->key < (KEY_LIST_FIRST + SEARCH_RESULT_MAX_DATA_NUMBER))){
@@ -137,6 +141,10 @@ int parse_detail_message_handler(DictionaryIterator *iterator){
 				break;
 			case KEY_DETAIL_RATING:
 				rating = t->value->uint8;
+				break;
+			case KEY_QUERY_TYPE:
+			case KEY_QUERY_UID:
+				// Simply ignore these keys, they are handled by receive callback
 				break;
 			default:
 				APP_LOG(APP_LOG_LEVEL_ERROR, "Invalid key: %d", (int)t->key);
