@@ -10,7 +10,7 @@ static AppTimer *s_wait_timeout_timer;	// Timer for dismissing waiting window
 
 // The waiting window
 static Window *s_wait_window;
-static TextLayer *s_wait_text_layer;
+static Layer *s_wait_banner_layer;
 static Layer *s_wait_layer;
 
 static void wait_timeout_timer_callback(void *context);
@@ -56,30 +56,40 @@ static void wait_layer_update_proc(Layer *layer, GContext *ctx){
 			   WAIT_ANIMATION_BAR_RADIUS, GCornersAll);
 }
 
+static void wait_banner_layer_update_proc(Layer *layer, GContext *ctx){
+	GRect bounds = layer_get_bounds(layer);
+
+	graphics_context_set_text_color(ctx, highlight_alt_text_color);
+	graphics_context_set_fill_color(ctx, highlight_alt_bg_color);
+	graphics_fill_rect(ctx, bounds, WAIT_BANNER_HEIGHT, GCornerNone);
+#ifdef PBL_ROUND
+	graphics_draw_text(ctx, wait_banner_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), 
+		GRect(bounds.origin.x, bounds.origin.y+WAIT_BANNER_TOP_MARGIN, bounds.size.w, bounds.size.h), GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+#else
+	graphics_draw_text(ctx, wait_banner_text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD), bounds,
+			   GTextOverflowModeFill, GTextAlignmentCenter, NULL);
+#endif
+}
+
 static void wait_window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
 	APP_LOG(APP_LOG_LEVEL_INFO, "Wait load");
 
-	s_wait_text_layer = text_layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, WAIT_TEXT_LAYER_HEIGHT));
-	s_wait_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y + WAIT_TEXT_LAYER_HEIGHT, 
-					  bounds.size.w, bounds.size.w - WAIT_TEXT_LAYER_HEIGHT));
+	s_wait_banner_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, WAIT_BANNER_HEIGHT));
+	layer_set_update_proc(s_wait_banner_layer, wait_banner_layer_update_proc);
+	layer_add_child(window_layer, s_wait_banner_layer);
 	
-	text_layer_set_font(s_wait_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-	text_layer_set_text_alignment(s_wait_text_layer, GTextAlignmentCenter);
-	text_layer_set_background_color(s_wait_text_layer, highlight_alt_bg_color);
-	text_layer_set_text_color(s_wait_text_layer, highlight_alt_text_color);
-	text_layer_set_text(s_wait_text_layer, wait_layer_header_text);
+	s_wait_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y + WAIT_BANNER_HEIGHT, 
+					  bounds.size.w, bounds.size.w - WAIT_BANNER_HEIGHT));
 	layer_set_update_proc(s_wait_layer, wait_layer_update_proc);
-
-	layer_add_child(window_layer, text_layer_get_layer(s_wait_text_layer));
 	layer_add_child(window_layer, s_wait_layer);
 }
 
 static void wait_window_unload(Window *window) {
 	layer_destroy(s_wait_layer);
-	text_layer_destroy(s_wait_text_layer);
+	layer_destroy(s_wait_banner_layer);
 
 	window_destroy(window);
 	s_wait_window = NULL;

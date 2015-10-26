@@ -14,7 +14,7 @@
 const char *main_menu_text[MAIN_MENU_ROWS];
 const char *main_banner_text;
 const char *setting_main_menu_header_text;
-const char *wait_layer_header_text;
+const char *wait_banner_text;
 
 const char *query_status_error_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
 const char *query_status_error_sub_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
@@ -239,6 +239,7 @@ static void main_window_load(Window *window) {
 	s_main_banner_layer = layer_create(GRect(bounds.origin.x, bounds.origin.y, bounds.size.w, MAIN_BANNER_HEIGHT));
 	layer_set_update_proc(s_main_banner_layer, main_banner_layer_update_proc);
 	layer_add_child(window_layer, s_main_banner_layer);
+
 	s_main_menu_layer = menu_layer_create(GRect(bounds.origin.x, bounds.origin.y+MAIN_BANNER_HEIGHT, 
 						    bounds.size.w, bounds.size.h-MAIN_BANNER_HEIGHT));
 #ifdef PBL_ROUND
@@ -349,7 +350,7 @@ static void initialize_const_strings(void){
 	main_menu_text[2] = _("Options");
 	main_banner_text = _("Where to eat?");
 	setting_main_menu_header_text = _("Options");
-	wait_layer_header_text = _("Searching...");
+	wait_banner_text = _("Searching...");
 
 	query_status_error_message[0] = "";
 	query_status_error_message[1] = _("No Result");

@@ -7,7 +7,12 @@
 #define WAIT_ANIMATION_BAR_HEIGHT	6
 #define WAIT_ANIMATION_BAR_RADIUS	(WAIT_ANIMATION_BAR_HEIGHT/2)
 #define WAIT_WINDOW_TIMEOUT		25000	// Wait window should timeout in 25 seconds. js location looking has only 20 seconds timeout.
-#define WAIT_TEXT_LAYER_HEIGHT		32
+#ifdef PBL_ROUND
+#define WAIT_BANNER_HEIGHT		44
+#define WAIT_BANNER_TOP_MARGIN		12
+#else
+#define WAIT_BANNER_HEIGHT		32
+#endif
 
 void wait_window_push(void);
 Window *get_wait_window(void);

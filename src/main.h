@@ -114,7 +114,7 @@ extern GColor highlight_alt_bg_color;
 extern const char *main_menu_text[MAIN_MENU_ROWS];
 extern const char *main_banner_text;
 extern const char *setting_main_menu_header_text;
-extern const char *wait_layer_header_text;
+extern const char *wait_banner_text;
 
 extern const char *query_status_error_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
 extern const char *query_status_error_sub_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
