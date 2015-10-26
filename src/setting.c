@@ -43,8 +43,13 @@ static void setting_main_menu_draw_header_handler(GContext *ctx, const Layer *ce
 	graphics_context_set_text_color(ctx, highlight_alt_text_color);
 	graphics_context_set_fill_color(ctx, highlight_alt_bg_color);
 	graphics_fill_rect(ctx, layer_get_bounds(cell_layer), 0, GCornerNone);
+#ifdef PBL_ROUND
+	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), 
+		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentCenter, NULL); 
+#else
 	graphics_draw_text(ctx, setting_main_menu_header_text, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD), 
 		layer_get_bounds(cell_layer), GTextOverflowModeFill, GTextAlignmentLeft, NULL); 
+#endif
 }
 
 static void setting_main_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
@@ -136,10 +141,17 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 			break;
 	}
 
+#ifdef PBL_ROUND
+	if(cell_index->row == selected_index)
+		menu_cell_basic_draw(ctx, cell_layer, text, NULL, icon_check_black_bitmap);
+	else
+		menu_cell_basic_draw(ctx, cell_layer, text, NULL, NULL);
+#else
 	if(cell_index->row == selected_index)
 		menu_cell_basic_draw(ctx, cell_layer, text, NULL, icon_check_black_bitmap);
 	else
 		menu_cell_basic_draw(ctx, cell_layer, text, NULL, icon_blank_bitmap);
+#endif
 }
 
 static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuIndex *cell_index, void *callback_context){
