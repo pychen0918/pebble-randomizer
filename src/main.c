@@ -365,7 +365,7 @@ static void initialize_const_strings(void){
 	query_status_error_sub_message[4] = _("Cannot find any information about this restraunt");
 
 	unknown_error_message = _("Unknown error");
-	unknown_error_sub_message = _("Please bring the following message to the author:");
+	unknown_error_sub_message = _("Error:");
 
 	setting_main_menu_text[0] = _("Range");
 	setting_main_menu_text[1] = _("Keyword");
@@ -384,7 +384,7 @@ static void initialize_const_strings(void){
 	setting_type_option_text[1] = _("Restaurant");
 	setting_type_option_text[2] = _("Cafe");
 	setting_type_option_text[3] = _("Bar");
-	setting_type_option_text[4] = _("CVS");
+	setting_type_option_text[4] = _("Convenience Store");
 	setting_type_option_text[5] = _("Food Delivery");
 	setting_type_option_text[6] = _("Takeout");
 	setting_opennow_option_text[0] = _("No");
