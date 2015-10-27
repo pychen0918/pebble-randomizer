@@ -84,7 +84,8 @@ static void result_window_load(Window *window) {
 			// Collect required fields
 			ptr = &(search_result.restaurant_info[search_result.random_result]);
 			strncpy(title_text, ptr->name, sizeof(title_text));
-			snprintf(sub_text, sizeof(sub_text), "%s %u %s", direction_name[ptr->direction], (unsigned int)(ptr->distance), distance_unit);
+			snprintf(sub_text, sizeof(sub_text), "%s %u %s", direction_name[ptr->direction], 
+				(unsigned int)(ptr->distance), setting_unit_option_text[user_setting.unit]);
 			break;
 		case QUERY_STATUS_NO_RESULT:
 		case QUERY_STATUS_GPS_TIMEOUT:

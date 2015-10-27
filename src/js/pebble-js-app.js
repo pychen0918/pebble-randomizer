@@ -4,9 +4,12 @@ var g_query_uid;
 var g_option_range;
 var g_option_type;
 var g_option_opennow;
+var g_option_price;
+var g_option_unit;
 
-var g_range_text = ["500","1000","5000","10000"];
-var g_type_text = ["food", "restaurant", "cafe", "bar"];
+var g_range_text = ["500", "1000", "5000", "10000", "805", "1610", "8050", "16100"];
+var g_type_text = ["food", "restaurant", "cafe", "bar", "convenience_store", "meal_delivery", "meal_takeaway"];
+var g_price_text = ["", "&maxprice=1&minprice=1", "&maxprice=2&minprice=2", "&maxprice=3&minprice=3", "&maxprice=4&minprice=4"];
 var g_opennow_text = ["", "&opennow"];
 
 // This key has been revoked. Use the true API key for test.
@@ -32,11 +35,16 @@ function xhrRequest(url, type, callback) {
 
 // Calculate distance by using approximation
 function getDistance(lat1, lon1, lat2, lon2) {
-	var R = 6731009;  // earth radius in meters
-	var a = (lat1 - lat2)*(Math.PI / 180);
-	var b = Math.cos((lat1+lat2)*(Math.PI/180)/2) * (lon1 - lon2)*(Math.PI/180);
+	var R, a, b;
 
-	return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters
+	if(g_option_unit == 0)
+		R = 6731009;	// earth radius in meters
+	else
+		R = 4182.455;	// earth radius in miles
+	a = (lat1 - lat2)*(Math.PI / 180);
+	b = Math.cos((lat1+lat2)*(Math.PI/180)/2) * (lon1 - lon2)*(Math.PI/180);
+
+	return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters or miles
 }
 
 // Calculate direction. 
@@ -58,6 +66,7 @@ function locationSuccess(pos){
 			"&radius=" + g_range_text[g_option_range] + 
 			"&types=" + g_type_text[g_option_type] +
 			g_opennow_text[g_option_opennow] +
+			g_price_text[g_option_price] +
 			"&key=" + api_key;
 	} 
 	else if(g_query_type == 1){ // detail
@@ -74,6 +83,7 @@ function locationSuccess(pos){
 			"&radius=" + g_range_text[g_option_range] + 
 			"&types=" + g_type_text[g_option_type] +
 			g_opennow_text[g_option_opennow] +
+			g_price_text[g_option_price] +
 			"&key=" + api_key;
 	}
 	console.log("url: " + url);
@@ -230,6 +240,11 @@ Pebble.addEventListener("appmessage",
 			g_option_range = e.payload['query_option_range'];
 			g_option_type = e.payload['query_option_type'];
 			g_option_opennow = e.payload['query_option_opennow'];
+			g_option_price = e.payload['query_option_price'];
+			if(g_option_range < 4)
+				g_option_unit = 0;
+			else
+				g_option_unit = 1;
 			getLocation();
 		}
 		else if(g_query_type == 1){ // detail

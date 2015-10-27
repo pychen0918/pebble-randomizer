@@ -24,13 +24,19 @@ static void setting_main_menu_draw_row_handler(GContext *ctx, const Layer *cell_
 	
 	switch(cell_index->row){
 		case SETTING_MENU_OPTION_RANGE:
-			sub_text = setting_range_option_text[user_setting.range];
+			sub_text = setting_range_option_text[user_setting.unit][user_setting.range];
 			break;
 		case SETTING_MENU_OPTION_TYPE:
 			sub_text = setting_type_option_text[user_setting.type];
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
 			sub_text = setting_opennow_option_text[user_setting.opennow];
+			break;
+		case SETTING_MENU_OPTION_PRICE:
+			sub_text = setting_price_option_text[user_setting.price];
+			break;
+		case SETTING_MENU_OPTION_UNIT:
+			sub_text = setting_unit_option_text[user_setting.unit];
 			break;
 		default:
 			break;
@@ -106,13 +112,19 @@ static uint16_t setting_sub_menu_get_num_rows_callback(struct MenuLayer *menulay
 	uint16_t ret = 0;
 	switch(menu_state.setting_menu_selected_option){
 		case SETTING_MENU_OPTION_RANGE:
-			ret = sizeof(setting_range_option_text)/sizeof(setting_range_option_text[0]);
+			ret = NUMBER_OF_RANGE_VALUE;
 			break;
 		case SETTING_MENU_OPTION_TYPE:
 			ret = sizeof(setting_type_option_text)/sizeof(setting_type_option_text[0]);
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
 			ret = sizeof(setting_opennow_option_text)/sizeof(setting_opennow_option_text[0]);
+			break;
+		case SETTING_MENU_OPTION_PRICE:
+			ret = sizeof(setting_price_option_text)/sizeof(setting_price_option_text[0]);
+			break;
+		case SETTING_MENU_OPTION_UNIT:
+			ret = sizeof(setting_unit_option_text)/sizeof(setting_unit_option_text[0]);
 			break;
 		default:
 			break;
@@ -127,7 +139,7 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 	switch(menu_state.setting_menu_selected_option){
 		case SETTING_MENU_OPTION_RANGE:
 			selected_index = user_setting.range;
-			text = setting_range_option_text[cell_index->row];
+			text = setting_range_option_text[user_setting.unit][cell_index->row];
 			break;
 		case SETTING_MENU_OPTION_TYPE:
 			selected_index = user_setting.type;
@@ -136,6 +148,14 @@ static void setting_sub_menu_draw_row_handler(GContext *ctx, const Layer *cell_l
 		case SETTING_MENU_OPTION_OPENNOW:
 			selected_index = user_setting.opennow;
 			text = setting_opennow_option_text[cell_index->row];
+			break;
+		case SETTING_MENU_OPTION_PRICE:
+			selected_index = user_setting.price;
+			text = setting_price_option_text[cell_index->row];
+			break;
+		case SETTING_MENU_OPTION_UNIT:
+			selected_index = user_setting.unit;
+			text = setting_unit_option_text[cell_index->row];
 			break;
 		default:
 			break;
@@ -168,6 +188,12 @@ static void setting_sub_menu_select_callback(struct MenuLayer *menu_layer, MenuI
 			break;
 		case SETTING_MENU_OPTION_OPENNOW:
 			user_setting.opennow = cell_index->row;
+			break;
+		case SETTING_MENU_OPTION_PRICE:
+			user_setting.price = cell_index->row;
+			break;
+		case SETTING_MENU_OPTION_UNIT:
+			user_setting.unit = cell_index->row;
 			break;
 		default:
 			break;

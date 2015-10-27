@@ -13,12 +13,15 @@ static int find_next_seperator(const char *string, const char seperator){
 // Send out the 'list' query to retrieve 20 nearby restaurant info
 void send_list_query(void){
 	DictionaryIterator *iter;
+	uint8_t range_index = user_setting.range + user_setting.unit*NUMBER_OF_RANGE_VALUE;
+
 	app_message_outbox_begin(&iter);
 	dict_write_uint8(iter, KEY_QUERY_TYPE, QUERY_TYPE_LIST);
 	dict_write_uint8(iter, KEY_QUERY_UID, get_next_uid());
-	dict_write_uint8(iter, KEY_QUERY_OPTION_RANGE, user_setting.range);
+	dict_write_uint8(iter, KEY_QUERY_OPTION_RANGE, range_index);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_TYPE, user_setting.type);
 	dict_write_uint8(iter, KEY_QUERY_OPTION_OPENNOW, user_setting.opennow);
+	dict_write_uint8(iter, KEY_QUERY_OPTION_PRICE, user_setting.price);
 	app_message_outbox_send();
 }
 

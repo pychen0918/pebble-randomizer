@@ -62,7 +62,7 @@ static void list_menu_draw_row_handler(GContext *ctx, const Layer *cell_layer, M
 	char sub_text[32];
 	GRect bounds = layer_get_bounds(cell_layer);
 
-	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), distance_unit);
+	snprintf(sub_text, sizeof(sub_text), "%s %d %s", direction_name[ptr->direction], (int)(ptr->distance), setting_unit_option_text[user_setting.unit]);
 
 #ifdef PBL_COLOR
 	if(menu_cell_layer_is_highlighted(cell_layer)){

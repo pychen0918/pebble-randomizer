@@ -17,6 +17,8 @@
 #else
 #define MAIN_BANNER_HEIGHT		32
 #endif
+#define NUMBER_OF_RANGE_VALUE		4	// for one unit, we have only 4 options
+#define NUMBER_OF_UNIT_VALUE		2	// for unit, we have only 2 options
 
 // What kind of operation user is currently performing
 #define USER_OPERATION_RANDOM		0
@@ -35,6 +37,8 @@
 #define DEFAULT_SEARCH_RANGE		1	// 1km
 #define DEFAULT_SEARCH_TYPE		1	// Restaurant
 #define DEFAULT_SEARCH_OPENNOW		0	// do not add opennow filter
+#define DEFAULT_SEARCH_PRICE		0	// don't care for price 
+#define DEFAULT_SEARCH_UNIT		0	// meters
 
 // Key for appmessage
 #define KEY_STATUS			0
@@ -45,6 +49,7 @@
 #define KEY_QUERY_OPTION_RANGE		10
 #define KEY_QUERY_OPTION_TYPE		11
 #define KEY_QUERY_OPTION_OPENNOW	12
+#define KEY_QUERY_OPTION_PRICE		13
 #define KEY_DETAIL_ADDRESS		20	// detail information returned by 'detail' query
 #define KEY_DETAIL_PHONE		21
 #define KEY_DETAIL_RATING		22
@@ -52,6 +57,10 @@
 
 // Key for persist storage
 #define PERSIST_KEY_USER_SETTING	40
+#define PERSIST_KEY_STORAGE_VERSION	50	// We changed storage layout in 1.1, need version control
+
+// Version string
+#define APP_VERSION_STRING		"1.1"
 
 // --------------------------------------------------------------------------------------
 // Data Structure Defination
@@ -81,10 +90,18 @@ typedef struct __search_result_t{
 } SearchResult;
 
 typedef struct __user_setting_t{
+	uint8_t range;				// Index of selected range (0: 500m or 0.5mi, 1: 1km or 1mi, 2: 5km or 5mi, 3: 10km or 10mi)
+	uint8_t type;				// Index of selected type (0: Food, 1: Restaurant, 2: Cafe, 3: Bar, 4: CVS, 5: Delivery, 6: Takeout)
+	uint8_t opennow;			// Index of selected opennow filter (0: Disable, 1: Enable)
+	uint8_t price;				// Index of selected price filter (0: Don't mind, 1: Inexpensive, 2: Moderate, 3: Expensive, 4: Very Expensive)
+	uint8_t unit;				// Index of selected distance units (0: meters, 1: miles)
+} UserSetting;
+
+typedef struct __old_user_setting_t{
 	uint8_t range;				// Index of selected range (0: 500m, 1: 1km, 2: 5km, 3: 10km)
 	uint8_t type;				// Index of selected type (0: Food, 1: Restaurant, 2: Cafe, 3: Bar)
 	uint8_t opennow;			// Index of selected opennow filter (0: Disable, 1: Enable)
-} UserSetting;
+} OldUserSetting;
 
 typedef struct __menu_status_t{
 	uint8_t user_operation;		 	// which function is currently performed by user (Random, List, Setting, Detail)
@@ -122,10 +139,13 @@ extern const char *query_status_error_sub_message[QUERY_STATUS_NUM_OF_ERROR_TYPE
 extern const char *unknown_error_message;
 extern const char *unknown_error_sub_message;
 
-extern const char *setting_main_menu_text[3];		// random, list, setting
-extern const char *setting_range_option_text[4];	// 500 M, 1 KM, 5 KM, 10 KM
-extern const char *setting_type_option_text[4];		// Food, Restaurant, Cafe, Bar
+extern const char *setting_main_menu_text[5];		// type, range, opennow, price level, units
+// meters: 500 M, 1 KM, 5 KM, 10 KM, miles: 0.5 miles, 1 miles, 5 miles, 10 miles
+extern const char *setting_range_option_text[NUMBER_OF_UNIT_VALUE][NUMBER_OF_RANGE_VALUE];	
+extern const char *setting_type_option_text[7];		// Food, Restaurant, Cafe, Bar, Convenience Store, Meal Delivery, Meal Takeaway
 extern const char *setting_opennow_option_text[2];	// No, Yes
+extern const char *setting_price_option_text[5];	// Don't care, Inexpensive, Moderate, Expensive, Very Expensive
+extern const char *setting_unit_option_text[NUMBER_OF_UNIT_VALUE];	// meters, miles
 
 extern const char *detail_address_text;
 extern const char *detail_phone_text;
@@ -134,7 +154,6 @@ extern const char *detail_nodata_text;
 extern const char *detail_star_text;
 
 extern const char *direction_name[9];			// N, NE, E, ..., NW, N, total 9
-extern const char *distance_unit;
 
 // --------------------------------------------------------------------------------------
 // Function prototypes

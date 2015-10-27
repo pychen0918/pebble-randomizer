@@ -22,10 +22,12 @@ const char *query_status_error_sub_message[QUERY_STATUS_NUM_OF_ERROR_TYPES];
 const char *unknown_error_message;
 const char *unknown_error_sub_message;
 
-const char *setting_main_menu_text[3];		// random, list, setting
-const char *setting_range_option_text[4];	// 500 M, 1 KM, 5 KM, 10 KM
-const char *setting_type_option_text[4];	// Food, Restaurant, Cafe, Bar
+const char *setting_main_menu_text[5];		// type, range, opennow, pricelevel, unit
+const char *setting_range_option_text[NUMBER_OF_UNIT_VALUE][NUMBER_OF_RANGE_VALUE];	// meters: 500 M, 1 KM, 5 KM, 10 KM, miles: 0.5 miles, 1 miles, 5 miles, 10 miles
+const char *setting_type_option_text[7];	// Food, Restaurant, Cafe, Bar, Convience Store, Food Delivery, Takeout
 const char *setting_opennow_option_text[2];	// No, Yes
+const char *setting_price_option_text[5];	// Don't mind, inexpensive, moderate, expensive, very expensive
+const char *setting_unit_option_text[NUMBER_OF_UNIT_VALUE];	// meters, miles
 
 const char *detail_address_text;
 const char *detail_phone_text;
@@ -34,7 +36,6 @@ const char *detail_nodata_text;
 const char *detail_star_text;
 
 const char *direction_name[9];			// N, NE, E, ..., NW, N, total 9
-const char *distance_unit;
 
 // --------------------------------------------------------------------------------------
 // The global variables
@@ -369,16 +370,32 @@ static void initialize_const_strings(void){
 	setting_main_menu_text[0] = _("Range");
 	setting_main_menu_text[1] = _("Keyword");
 	setting_main_menu_text[2] = _("Open Now Only");
-	setting_range_option_text[0] = _("500 M");
-	setting_range_option_text[1] = _("1 KM");
-	setting_range_option_text[2] = _("5 KM");
-	setting_range_option_text[3] = _("10 KM");
+	setting_main_menu_text[3] = _("Price Level");
+	setting_main_menu_text[4] = _("Distance Units");
+	setting_range_option_text[0][0] = _("500 M");
+	setting_range_option_text[0][1] = _("1 KM");
+	setting_range_option_text[0][2] = _("5 KM");
+	setting_range_option_text[0][3] = _("10 KM");
+	setting_range_option_text[1][0] = _("0.5 miles");
+	setting_range_option_text[1][1] = _("1 mile");
+	setting_range_option_text[1][2] = _("5 miles");
+	setting_range_option_text[1][3] = _("10 miles");
 	setting_type_option_text[0] = _("Food");
 	setting_type_option_text[1] = _("Restaurant");
 	setting_type_option_text[2] = _("Cafe");
 	setting_type_option_text[3] = _("Bar");
+	setting_type_option_text[4] = _("CVS");
+	setting_type_option_text[5] = _("Food Delivery");
+	setting_type_option_text[6] = _("Takeout");
 	setting_opennow_option_text[0] = _("No");
 	setting_opennow_option_text[1] = _("Yes");
+	setting_price_option_text[0] = _("Don't mind");
+	setting_price_option_text[1] = _("Inexpensive");
+	setting_price_option_text[2] = _("Moderate");
+	setting_price_option_text[3] = _("Expensive");
+	setting_price_option_text[4] = _("Very Expensive");
+	setting_unit_option_text[0] = _("Meters");
+	setting_unit_option_text[1] = _("Miles");
 
 	detail_address_text = _("Address: ");
 	detail_phone_text = _("Tel: ");
@@ -395,7 +412,6 @@ static void initialize_const_strings(void){
 	direction_name[6] = _("W");
 	direction_name[7] = _("NW");
 	direction_name[8] = _("N");
-	distance_unit = _("meters");
 }
 
 static void initialize_color(void){
@@ -416,7 +432,38 @@ static void initialize_color(void){
 #endif
 }
 
+static void set_default_user_settings(void){
+	user_setting.range = DEFAULT_SEARCH_RANGE;
+	user_setting.type = DEFAULT_SEARCH_TYPE;
+	user_setting.opennow = DEFAULT_SEARCH_OPENNOW;
+	user_setting.price = DEFAULT_SEARCH_PRICE;
+	user_setting.unit = DEFAULT_SEARCH_UNIT;
+}
+
+static void read_persist_v1_0(void){
+	OldUserSetting old_setting;
+	if(persist_exists(PERSIST_KEY_USER_SETTING)){
+		persist_read_data(PERSIST_KEY_USER_SETTING, &old_setting, sizeof(old_setting));
+		user_setting.range = old_setting.range;
+		user_setting.type = old_setting.type;
+		user_setting.opennow = old_setting.opennow;
+		user_setting.price = DEFAULT_SEARCH_PRICE;
+		user_setting.unit = DEFAULT_SEARCH_UNIT;
+	}
+	else
+		set_default_user_settings();
+}
+
+static void read_persist_v1_1(void){
+	if(persist_exists(PERSIST_KEY_USER_SETTING))
+		persist_read_data(PERSIST_KEY_USER_SETTING, &user_setting, sizeof(user_setting));
+	else
+		set_default_user_settings();
+}
+
 static void init(){
+	char version[8];
+
 	// Initialize locale framework
 	locale_init();
 
@@ -438,13 +485,22 @@ static void init(){
 	search_result.uid_next = MESSAGE_UID_FIRST;
 	search_result.is_querying = false;
 	search_result.is_setting_changed = false;
-	if(persist_exists(PERSIST_KEY_USER_SETTING))
-		persist_read_data(PERSIST_KEY_USER_SETTING, &user_setting, sizeof(user_setting));
-	else{
-		user_setting.range = DEFAULT_SEARCH_RANGE;
-		user_setting.type = DEFAULT_SEARCH_TYPE;
-		user_setting.opennow = DEFAULT_SEARCH_OPENNOW;
+
+	if(persist_exists(PERSIST_KEY_STORAGE_VERSION)){
+		persist_read_string(PERSIST_KEY_STORAGE_VERSION, version, sizeof(version));
+		if(!strcmp(version, "1.1")){
+			read_persist_v1_1();
+		}
+		else{
+			// we should never be here. If we do, just set default value.
+			set_default_user_settings();
+		}
 	}
+	else{
+		// Not exist, should be v1.0
+		read_persist_v1_0();
+	}
+
 	menu_state.user_operation = USER_OPERATION_RANDOM;
 	menu_state.setting_menu_selected_option = SETTING_MENU_OPTION_RANGE;
 	menu_state.user_detail_index = 0;
@@ -476,6 +532,7 @@ static void deinit(){
 
 	// Update Persist data
 	persist_write_data(PERSIST_KEY_USER_SETTING, &user_setting, sizeof(user_setting));
+	persist_write_string(PERSIST_KEY_STORAGE_VERSION, APP_VERSION_STRING);
 }
 
 int main(void) {
