@@ -44,7 +44,11 @@ function getDistance(lat1, lon1, lat2, lon2) {
 	a = (lat1 - lat2)*(Math.PI / 180);
 	b = Math.cos((lat1+lat2)*(Math.PI/180)/2) * (lon1 - lon2)*(Math.PI/180);
 
-	return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters or miles
+	if(g_option_unit == 0)
+		return Math.round((R * Math.sqrt( a*a + b*b ))/10)*10;  // roundup the number to 10 meters
+	else
+		return Math.round(R * Math.sqrt( a*a + b*b ) * 100);
+		
 }
 
 // Calculate direction. 
